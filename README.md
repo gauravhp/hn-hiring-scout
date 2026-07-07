@@ -47,13 +47,32 @@ GOOGLE_SHEETS_CREDENTIALS_FILE=/absolute/path/to/service-account.json
 
 Share the Google Sheet with the service account email from the credentials JSON.
 
-### 3. Edit your profile
+### 3. Generate or edit your profile
 
-Use one of:
+If you want to generate a draft profile from your resume, case studies, notes, or an entire career-profile folder:
+
+```bash
+python3 generate_profile.py \
+  --input "/path/to/resume.pdf" \
+  --input "/path/to/case-studies" \
+  --output profile.generated.yaml
+```
+
+Preview what files will be read without calling the LLM:
+
+```bash
+python3 generate_profile.py --input ~/Career_Profile --dry-run
+```
+
+The generator sends extracted document text to your configured LLM provider. Review the generated geography, work authorization, compensation, and hard filters before using the profile for job analysis.
+
+You can also edit a profile manually. Use one of:
+
 
 ```bash
 profile.yaml
 profile.gaurav.yaml
+profile.generated.yaml
 ```
 
 The profile controls:
@@ -175,6 +194,10 @@ Fetches the HN story and its top-level comments using the official Hacker News F
 
 Runs prefiltering, LLM extraction, hard filtering, heuristic scoring, LLM matching, outreach generation, and Markdown report generation.
 
+`generate_profile.py`
+
+Generates a validated profile YAML from resumes, case studies, notes, PDFs, text files, DOCX files, or directories of candidate material.
+
 `sync_google_sheet.py`
 
 Syncs processed job results into a Google Sheets CRM.
@@ -220,6 +243,94 @@ Generated Markdown reports.
 Optional local location for Google service account credentials. Do not commit private credentials.
 
 ## Commands
+
+## `generate_profile.py`
+
+Generates a validated HN Hiring Scout profile YAML from candidate documents.
+
+### Basic usage
+
+```bash
+python3 generate_profile.py \
+  --input "/path/to/resume.pdf" \
+  --input "/path/to/case-studies" \
+  --output profile.generated.yaml
+```
+
+You can pass files, directories, or both. Directories are scanned recursively.
+
+```bash
+python3 generate_profile.py \
+  --input "/path/to/resume.pdf" \
+  --input "/path/to/case-study.pdf" \
+  --input "/path/to/notes" \
+  --output profile.generated.yaml
+```
+
+### Dry run
+
+```bash
+python3 generate_profile.py --input ~/Career_Profile --dry-run
+```
+
+Dry-run extracts local text and prints file sizes. It does not call the LLM and does not write a profile.
+
+### Supported input files
+
+- PDF files through `pypdf`
+- DOCX files through `python-docx`
+- text-like files such as `.txt`, `.md`, `.yaml`, `.yml`, `.json`, `.csv`, and `.tsv`
+- unknown extensions when they safely decode as text
+
+Hidden files are skipped. Very large files are skipped by default to avoid accidentally sending irrelevant binary data.
+
+### Options
+
+`--input`
+
+File or directory to use as evidence. Can be repeated.
+
+`--output`
+
+Required unless using `--dry-run` or `--self-test`. Generated YAML path.
+
+`--template`
+
+Profile schema/template source. Defaults to `profile.yaml`.
+
+```bash
+python3 generate_profile.py --input ~/Career_Profile --output profile.generated.yaml --template profile.yaml
+```
+
+`--max-chars`
+
+Maximum evidence characters used for the final profile generation call. If extracted text is larger, the script summarizes chunks with the LLM first.
+
+`--force`
+
+Overwrite the output file if it already exists.
+
+`--include-private-links`
+
+Allows the LLM to populate personal links found in the documents. By default, links stay as placeholders or null.
+
+`--include-evidence-section`
+
+Adds an `evidence_profile` section with short source-backed notes.
+
+`--self-test`
+
+Runs local validation and extraction tests.
+
+```bash
+python3 generate_profile.py --self-test
+```
+
+### Schema safety
+
+`generate_profile.py` treats `profile.yaml` as the live schema. It validates that generated profiles keep the same top-level sections and nested shapes, preserve geography/work authorization fields, and keep `scoring_weights` summed to 100. If `profile.yaml` changes and the generated result no longer matches, the run fails before writing the profile.
+
+Document contents are sent to your configured LLM provider. Review generated geography, work authorization, compensation, and hard filters before using the profile for analysis.
 
 ## `fetch_hn.py`
 
@@ -556,6 +667,27 @@ Manual CRM columns are preserved on sync:
 - `do_not_apply`
 
 ## Common Recipes
+
+### Generate a profile from all career documents
+
+```bash
+python3 generate_profile.py --input ~/Career_Profile --output profile.generated.yaml
+```
+
+Then review `profile.generated.yaml` before using it:
+
+```bash
+python3 analyze_jobs.py --month 2026-07 --profile profile.generated.yaml --dry-run
+```
+
+### Generate a profile with source-backed notes
+
+```bash
+python3 generate_profile.py \
+  --input ~/Career_Profile \
+  --output profile.generated.yaml \
+  --include-evidence-section
+```
 
 ### Analyze everything eligible, but still skip obvious mismatches
 

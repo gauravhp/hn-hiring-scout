@@ -1,0 +1,291 @@
+# Generated HN Hiring Scout profile.
+# Review geography, work authorization, compensation, and hard filters before analysis.
+# Template source: profile.yaml
+
+candidate:
+  name: Gaurav Parmar
+  headline: Senior / Staff-level Software Engineer, hands-on architect, backend/platform and AI product
+    builder
+  summary: 'Senior software engineer with 20 years of experience building, rescuing, and scaling production
+    software systems. Strongest in backend architecture, platform design, full-stack product delivery,
+    cloud deployments, AI-assisted product features, and leading small engineering teams while staying
+    hands-on. Experienced in zero-to-one MVPs, vendor rescue, marketplace platforms, internal enterprise
+    systems, developer productivity, and founder-facing technical leadership.
+
+    '
+  years_experience: 20
+  current_status: open to senior hands-on engineering roles
+  country: EDIT_ME
+  region: EDIT_ME
+  city: EDIT_ME
+  timezone: EDIT_ME
+  can_work_in_us: false
+  can_work_in_eu: false
+  can_work_in_uk: false
+  requires_visa_sponsorship: true
+  eligible_remote_regions:
+  - Worldwide
+  - Anywhere
+  - Global
+  ineligible_remote_regions:
+  - US only
+  - Remote US
+  - US-based only
+  - EU only
+  - UK only
+  location: EDIT_ME
+  work_authorization: EDIT_ME
+  links:
+    website: YOUR_WEBSITE_OR_NULL
+    linkedin: YOUR_LINKEDIN_OR_NULL
+    github: github.com/gauravhp
+    resume: YOUR_RESUME_URL_OR_NULL
+target_roles:
+  strongly_prefer:
+  - Staff Software Engineer
+  - Principal Software Engineer
+  - Senior Backend Engineer
+  - Founding Engineer
+  - AI Engineer
+  - AI Infrastructure Engineer
+  - Engineering Lead, hands-on
+  - Backend / Platform Engineer
+  - Technical Lead, individual contributor
+  - Fractional CTO / Interim CTO
+  open_to:
+  - Senior Full Stack Engineer
+  - Staff Full Stack Engineer
+  - Solutions Architect, hands-on
+  - Product-minded Backend Engineer
+  - Startup CTO
+avoid_roles:
+- intern
+- junior
+- frontend-only
+- mobile-only
+- QA-only
+- devrel-only
+- pure engineering manager
+- TPM
+- sales engineer
+- unpaid/equity-only
+- support-only
+- data labeling
+- prompt writer only
+skills:
+  strongest:
+  - backend architecture
+  - distributed systems
+  - system design
+  - Java
+  - Node.js
+  - Python
+  - SQL
+  - PostgreSQL
+  - Oracle Database
+  - REST APIs
+  - microservices rescue and stabilization
+  - monolith design for early-stage products
+  - cloud deployment
+  - CI/CD
+  - Docker
+  - technical leadership
+  - mentoring engineers
+  - startup execution
+  - MVP delivery
+  - AI product integration
+  - LLM prompt and guardrail design
+  comfortable:
+  - React
+  - JavaScript
+  - AngularJS
+  - HTML
+  - CSS
+  - MongoDB
+  - MySQL
+  - GCP
+  - Render
+  - n8n
+  - Stripe
+  - Shell scripting
+  - C++
+  - observability and troubleshooting
+  learning_or_interested:
+  - AI infrastructure
+  - agentic software systems
+  - LLM evaluation
+  - retrieval-augmented generation
+  - workflow automation
+  - developer tools for AI-assisted engineering
+  - multi-tenant SaaS architecture
+  - enterprise AI deployments
+  avoid_or_not_primary:
+  - frontend-only UI implementation
+  - mobile-only app development
+  - manual QA
+  - low-code/no-code-only development
+  - WordPress
+  - PHP
+  - hardware/embedded systems
+  - blockchain/web3 unless the engineering problem is exceptional
+  - pure people management
+domains:
+  interested:
+  - AI tools
+  - AI infrastructure
+  - developer tools
+  - platform engineering
+  - backend infrastructure
+  - B2B SaaS
+  - marketplaces
+  - education technology
+  - knowledge platforms
+  - workflow automation
+  - data privacy / governance
+  - cloud infrastructure
+  - founder-led startups
+  - zero-to-one products
+  - turnaround / rescue engineering
+  neutral:
+  - fintech
+  - healthcare software
+  - e-commerce
+  - enterprise SaaS
+  - internal tools
+  - analytics
+  - logistics
+  - consumer apps with strong backend complexity
+  avoid:
+  - adtech
+  - crypto/web3
+  - gambling
+  - adult content
+  - surveillance
+  - weapons
+  - hardware-first products
+  - mobile-only consumer apps
+  - agency body-shopping
+work_preferences:
+  remote:
+    preference: strongly_preferred
+    notes: Remote-first or remote-friendly teams are preferred, especially async teams that work across
+      time zones.
+  acceptable_locations:
+  - Worldwide
+  - Anywhere
+  - Global
+  - Remote
+  - India remote
+  - Asia-friendly remote
+  - timezone-overlap remote
+  unacceptable_locations:
+  - US only
+  - Remote US
+  - US-based only
+  - EU only
+  - UK only
+  - onsite-only outside EDIT_ME
+  - hybrid with frequent office attendance outside EDIT_ME
+  - roles requiring relocation unless explicitly attractive
+  company_stage_preferences:
+    strongly_prefer:
+    - bootstrapped with real customers
+    - seed
+    - series A
+    - series B
+    - profitable small company
+    - founder-led company with technical urgency
+    open_to:
+    - series C+
+    - public company with a small autonomous team
+    - consulting/fractional CTO engagement with clear ownership
+    avoid:
+    - large slow-moving enterprise unless role has unusual technical depth
+    - outsourcing agency
+    - staff augmentation vendor
+    - unfunded idea with no pay
+  team_size_preferences:
+    strongly_prefer:
+    - small senior engineering team
+    - founding team
+    - 2-12 engineers
+    - hands-on leadership role
+    open_to:
+    - mid-sized engineering org
+    - cross-functional product team
+    avoid:
+    - large coordination-heavy org
+    - management-only ladder
+    - team with unclear technical ownership
+  preferred_work_style:
+  - high ownership
+  - hands-on coding
+  - architecture plus implementation
+  - clear business context
+  - direct founder or product collaboration
+  - async-friendly communication
+  - small number of high-quality meetings
+  - pragmatic engineering over process theater
+  - measurable production impact
+compensation:
+  minimum_base_usd: null
+  desired_base_usd: null
+  minimum_hourly_usd: 80
+  annualize_hourly_rate: false
+  equity_preference: nice_to_have_but_cash_compensation_matters
+  notes: 'Prefer clearly paid roles with realistic compensation for senior/staff-level engineering. Equity-only,
+    unpaid, or vague compensation should be rejected. Adjust minimum_base_usd and desired_base_usd before
+    using compensation as a hard filter.
+
+    '
+hard_filters:
+  reject_onsite_only: true
+  reject_hybrid_more_than_days_per_week: 1
+  reject_unpaid: true
+  reject_equity_only: true
+  reject_internships: true
+  reject_junior_roles: true
+  reject_non_engineering_roles: true
+  reject_frontend_only: true
+  reject_mobile_only: true
+  reject_wrong_geo: true
+  minimum_salary_if_disclosed: null
+scoring_weights:
+  role_seniority_match: 20
+  skill_match: 25
+  domain_interest: 15
+  remote_location_fit: 15
+  compensation_fit: 10
+  company_stage_fit: 8
+  post_quality_signal: 7
+outreach:
+  tone: concise, senior, practical, low-hype
+  max_words: 180
+  things_to_emphasize:
+  - 20 years of software engineering experience
+  - hands-on backend and platform architecture
+  - ability to rescue broken systems and ship production software
+  - zero-to-one MVP and founder-facing execution
+  - AI product integration with guardrails against hallucination
+  - remote team leadership and mentoring
+  - pragmatic tradeoffs under budget and time pressure
+  things_to_avoid:
+  - sounding like a generic full-stack developer
+  - overclaiming AI research depth
+  - claiming expertise not present in the job post or profile
+  - long cover-letter style paragraphs
+  - desperation or excessive enthusiasm
+  - sharing private compensation or personal details unless explicitly configured
+feedback_preferences:
+  common_skip_reasons:
+    too_junior: Role is below senior/staff scope or emphasizes learning over ownership.
+    wrong_location: Location, timezone, onsite, hybrid, or work authorization constraints do not fit.
+    too_frontend: Role is primarily frontend UI implementation with limited backend/platform depth.
+    too_mobile: Role is primarily iOS/Android/mobile app work.
+    too_hardware: Role focuses on hardware, embedded systems, robotics, or device integration.
+    too_management_heavy: Role is primarily people management, process, planning, or coordination.
+    compensation_too_low: Disclosed compensation is below configured minimums.
+    equity_only: Role is unpaid, equity-only, or compensation is not credible.
+    domain_not_interesting: Domain is low-interest or explicitly avoided.
+    vague_post: Post lacks enough concrete role, stack, company, location, or compensation detail.
+  ranking_style: ruthless
