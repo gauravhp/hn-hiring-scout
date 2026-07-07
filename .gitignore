@@ -1,0 +1,10 @@
+.env
+credentials/
+*.json
+data/raw/
+data/processed/
+data/reports/
+__pycache__/
+*.pyc
+.DS_Store
+profile.gaurav.yaml

@@ -1,0 +1,386 @@
+# HN Hiring Scout profile.
+#
+# Edit this file as your preferences change. The analyzer should treat this as
+# the source of truth for filtering and ranking Hacker News job posts.
+#
+# Keep values concrete where possible. Use null when you do not want a field to
+# act as a filter yet.
+
+candidate:
+  # Use your real name locally if you want generated outreach drafts to include it.
+  name: "YOUR_NAME"
+
+  # A short positioning line. Keep it specific enough for ranking, not just a title.
+  headline: "Senior / Staff-level Software Engineer, hands-on architect, backend/platform and AI product builder"
+
+  # Prefer a factual summary over marketing language. This gives the LLM context
+  # for ranking jobs and drafting outreach.
+  summary: >
+    Senior software engineer with 20 years of experience building, rescuing,
+    and scaling production software systems. Strongest in backend architecture,
+    platform design, full-stack product delivery, cloud deployments, AI-assisted
+    product features, and leading small engineering teams while staying hands-on.
+    Experienced in zero-to-one MVPs, vendor rescue, marketplace platforms,
+    internal enterprise systems, developer productivity, and founder-facing
+    technical leadership.
+
+  years_experience: 20
+
+  # Examples: "actively looking", "open to the right role", "consulting",
+  # "not currently looking".
+  current_status: "open to senior hands-on engineering roles"
+
+  # Geo fields below must be accurate. The analyzer can use them to prefilter
+  # obvious mismatches such as "Remote US", "EU only", or location-specific jobs
+  # before spending LLM calls.
+  country: "EDIT_ME"
+  region: "EDIT_ME"
+  city: "EDIT_ME"
+  timezone: "EDIT_ME"
+  can_work_in_us: false
+  can_work_in_eu: false
+  can_work_in_uk: false
+  requires_visa_sponsorship: true
+  eligible_remote_regions:
+    - "Worldwide"
+    - "Anywhere"
+    - "Global"
+  ineligible_remote_regions:
+    - "US only"
+    - "Remote US"
+    - "US-based only"
+    - "EU only"
+    - "UK only"
+
+  # Keep this broad if you do not want location to dominate matching.
+  location: "YOUR_CITY_OR_REGION"
+
+  # Examples: "authorized to work in India", "need US visa sponsorship",
+  # "open to contractor roles globally". Keep this explicit for geo filtering.
+  work_authorization: "EDIT_ME"
+
+  # Do not include links you do not want reused in generated outreach.
+  links:
+    website: "YOUR_WEBSITE_OR_NULL"
+    linkedin: "YOUR_LINKEDIN_OR_NULL"
+    github: "YOUR_GITHUB_OR_NULL"
+    resume: "YOUR_RESUME_URL_OR_NULL"
+
+target_roles:
+  # Roles to rank highly when the post also matches skills, domain, and location.
+  strongly_prefer:
+    - "Staff Software Engineer"
+    - "Principal Software Engineer"
+    - "Senior Backend Engineer"
+    - "Founding Engineer"
+    - "AI Engineer"
+    - "AI Infrastructure Engineer"
+    - "Engineering Lead, hands-on"
+    - "Backend / Platform Engineer"
+    - "Technical Lead, individual contributor"
+    - "Fractional CTO / Interim CTO"
+
+  # Acceptable roles, but they should not outrank strong matches above unless
+  # the post has unusually good evidence.
+  open_to:
+    - "Senior Full Stack Engineer"
+    - "Staff Full Stack Engineer"
+    - "Solutions Architect, hands-on"
+    - "Product-minded Backend Engineer"
+    - "Startup CTO"
+
+avoid_roles:
+  # These should usually be rejected or heavily penalized.
+  - "intern"
+  - "junior"
+  - "frontend-only"
+  - "mobile-only"
+  - "QA-only"
+  - "devrel-only"
+  - "pure engineering manager"
+  - "TPM"
+  - "sales engineer"
+  - "unpaid/equity-only"
+  - "support-only"
+  - "data labeling"
+  - "prompt writer only"
+
+skills:
+  # Skills where matching jobs should receive a strong positive signal.
+  strongest:
+    - "backend architecture"
+    - "distributed systems"
+    - "system design"
+    - "Java"
+    - "Node.js"
+    - "Python"
+    - "SQL"
+    - "PostgreSQL"
+    - "Oracle Database"
+    - "REST APIs"
+    - "microservices rescue and stabilization"
+    - "monolith design for early-stage products"
+    - "cloud deployment"
+    - "CI/CD"
+    - "Docker"
+    - "technical leadership"
+    - "mentoring engineers"
+    - "startup execution"
+    - "MVP delivery"
+    - "AI product integration"
+    - "LLM prompt and guardrail design"
+
+  # Skills you can use productively, but they should not define the ideal role.
+  comfortable:
+    - "React"
+    - "JavaScript"
+    - "TypeScript"
+    - "AngularJS"
+    - "HTML"
+    - "CSS"
+    - "MongoDB"
+    - "MySQL"
+    - "Elasticsearch"
+    - "Kibana"
+    - "RabbitMQ"
+    - "GCP"
+    - "Render"
+    - "Vercel"
+    - "Heroku"
+    - "n8n"
+    - "Stripe"
+    - "Shell scripting"
+    - "C++"
+    - "Kubernetes-adjacent infrastructure"
+    - "observability and troubleshooting"
+
+  # Technologies/domains you would like to grow into. These can boost a role,
+  # but should not compensate for a poor seniority or location fit.
+  learning_or_interested:
+    - "AI infrastructure"
+    - "agentic software systems"
+    - "LLM evaluation"
+    - "retrieval-augmented generation"
+    - "workflow automation"
+    - "developer tools for AI-assisted engineering"
+    - "multi-tenant SaaS architecture"
+    - "enterprise AI deployments"
+
+  # Skills that should not be the main focus of the job.
+  avoid_or_not_primary:
+    - "frontend-only UI implementation"
+    - "mobile-only app development"
+    - "manual QA"
+    - "low-code/no-code-only development"
+    - "WordPress"
+    - "PHP"
+    - "hardware/embedded systems"
+    - "blockchain/web3 unless the engineering problem is exceptional"
+    - "pure people management"
+
+domains:
+  # Domains to rank higher when there is evidence in the post.
+  interested:
+    - "AI tools"
+    - "AI infrastructure"
+    - "developer tools"
+    - "platform engineering"
+    - "backend infrastructure"
+    - "B2B SaaS"
+    - "marketplaces"
+    - "education technology"
+    - "knowledge platforms"
+    - "workflow automation"
+    - "data privacy / governance"
+    - "cloud infrastructure"
+    - "founder-led startups"
+    - "zero-to-one products"
+    - "turnaround / rescue engineering"
+
+  # Fine, but not a major positive signal by itself.
+  neutral:
+    - "fintech"
+    - "healthcare software"
+    - "e-commerce"
+    - "enterprise SaaS"
+    - "internal tools"
+    - "analytics"
+    - "logistics"
+    - "consumer apps with strong backend complexity"
+
+  # Usually skip unless the role is unusually strong on other dimensions.
+  avoid:
+    - "adtech"
+    - "crypto/web3"
+    - "gambling"
+    - "adult content"
+    - "surveillance"
+    - "weapons"
+    - "hardware-first products"
+    - "mobile-only consumer apps"
+    - "agency body-shopping"
+
+work_preferences:
+  remote:
+    # Suggested values: "required", "strongly_preferred", "open_to_hybrid",
+    # "open_to_onsite".
+    preference: "strongly_preferred"
+    notes: "Remote-first or remote-friendly teams are preferred, especially async teams that work across time zones."
+
+  acceptable_locations:
+    # Keep this aligned with candidate.eligible_remote_regions and your actual
+    # work authorization. The prefilter may reject jobs outside this list.
+    - "Worldwide"
+    - "Anywhere"
+    - "Global"
+    - "Remote"
+    - "India remote"
+    - "Asia-friendly remote"
+    - "timezone-overlap remote"
+
+  unacceptable_locations:
+    # Keep this aligned with candidate.ineligible_remote_regions. Be precise:
+    # these values may cause Remote US / EU-only / location-specific jobs to be
+    # rejected before LLM ranking.
+    - "US only"
+    - "Remote US"
+    - "US-based only"
+    - "EU only"
+    - "UK only"
+    - "onsite-only outside YOUR_ACCEPTABLE_REGION"
+    - "hybrid with frequent office attendance outside YOUR_ACCEPTABLE_REGION"
+    - "roles requiring relocation unless explicitly attractive"
+
+  company_stage_preferences:
+    strongly_prefer:
+      - "bootstrapped with real customers"
+      - "seed"
+      - "series A"
+      - "series B"
+      - "profitable small company"
+      - "founder-led company with technical urgency"
+    open_to:
+      - "series C+"
+      - "public company with a small autonomous team"
+      - "consulting/fractional CTO engagement with clear ownership"
+    avoid:
+      - "large slow-moving enterprise unless role has unusual technical depth"
+      - "outsourcing agency"
+      - "staff augmentation vendor"
+      - "unfunded idea with no pay"
+
+  team_size_preferences:
+    strongly_prefer:
+      - "small senior engineering team"
+      - "founding team"
+      - "2-12 engineers"
+      - "hands-on leadership role"
+    open_to:
+      - "mid-sized engineering org"
+      - "cross-functional product team"
+    avoid:
+      - "large coordination-heavy org"
+      - "management-only ladder"
+      - "team with unclear technical ownership"
+
+  preferred_work_style:
+    - "high ownership"
+    - "hands-on coding"
+    - "architecture plus implementation"
+    - "clear business context"
+    - "direct founder or product collaboration"
+    - "async-friendly communication"
+    - "small number of high-quality meetings"
+    - "pragmatic engineering over process theater"
+    - "measurable production impact"
+
+compensation:
+  # Set real numbers when ready. Use null if compensation should not filter yet.
+  minimum_base_usd: null
+  desired_base_usd: null
+  minimum_hourly_usd: 80
+  annualize_hourly_rate: false
+
+  # Examples: "nice_to_have", "important", "not_important", "cash_preferred".
+  equity_preference: "nice_to_have_but_cash_compensation_matters"
+
+  notes: >
+    Prefer clearly paid roles with realistic compensation for senior/staff-level
+    engineering. Equity-only, unpaid, or vague compensation should be rejected.
+    Adjust minimum_base_usd and desired_base_usd before using compensation as a
+    hard filter.
+
+hard_filters:
+  # These are intended to be deterministic filters before LLM ranking.
+  reject_onsite_only: true
+
+  # Set to 0 to reject any hybrid requirement. Set to null to disable.
+  reject_hybrid_more_than_days_per_week: 1
+
+  reject_unpaid: true
+  reject_equity_only: true
+  reject_internships: true
+  reject_junior_roles: true
+  reject_non_engineering_roles: true
+  reject_frontend_only: true
+  reject_mobile_only: true
+
+  # True means reject posts whose location constraints clearly conflict with
+  # work_preferences.acceptable_locations.
+  reject_wrong_geo: true
+
+  # Use null until you set a real threshold. If set, only apply when the job post
+  # actually discloses salary; do not invent missing compensation.
+  minimum_salary_if_disclosed: null
+
+scoring_weights:
+  # These must sum to 100. Keep weights ruthless: seniority, skills, location,
+  # and compensation should beat vague excitement.
+  role_seniority_match: 20
+  skill_match: 25
+  domain_interest: 15
+  remote_location_fit: 15
+  compensation_fit: 10
+  company_stage_fit: 8
+  post_quality_signal: 7
+
+outreach:
+  # The style to use if a later version generates application notes.
+  tone: "concise, senior, practical, low-hype"
+  max_words: 180
+
+  things_to_emphasize:
+    - "20 years of software engineering experience"
+    - "hands-on backend and platform architecture"
+    - "ability to rescue broken systems and ship production software"
+    - "zero-to-one MVP and founder-facing execution"
+    - "AI product integration with guardrails against hallucination"
+    - "remote team leadership and mentoring"
+    - "pragmatic tradeoffs under budget and time pressure"
+
+  things_to_avoid:
+    - "sounding like a generic full-stack developer"
+    - "overclaiming AI research depth"
+    - "claiming expertise not present in the job post or profile"
+    - "long cover-letter style paragraphs"
+    - "desperation or excessive enthusiasm"
+    - "sharing private compensation or personal details unless explicitly configured"
+
+feedback_preferences:
+  # Common skip reasons the report can use. Keep these short and stable so they
+  # are easy to scan and later aggregate.
+  common_skip_reasons:
+    too_junior: "Role is below senior/staff scope or emphasizes learning over ownership."
+    wrong_location: "Location, timezone, onsite, hybrid, or work authorization constraints do not fit."
+    too_frontend: "Role is primarily frontend UI implementation with limited backend/platform depth."
+    too_mobile: "Role is primarily iOS/Android/mobile app work."
+    too_hardware: "Role focuses on hardware, embedded systems, robotics, or device integration."
+    too_management_heavy: "Role is primarily people management, process, planning, or coordination."
+    compensation_too_low: "Disclosed compensation is below configured minimums."
+    equity_only: "Role is unpaid, equity-only, or compensation is not credible."
+    domain_not_interesting: "Domain is low-interest or explicitly avoided."
+    vague_post: "Post lacks enough concrete role, stack, company, location, or compensation detail."
+
+  # Use this to make the report more or less harsh. Suggested values:
+  # "ruthless", "balanced", "exploratory".
+  ranking_style: "ruthless"

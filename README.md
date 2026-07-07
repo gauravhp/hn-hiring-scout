@@ -1,0 +1,620 @@
+# HN Hiring Scout
+
+HN Hiring Scout is a local Python tool for scanning Hacker News "Who is Hiring?" threads. It fetches top-level HN job posts, prefilters obvious mismatches, uses an OpenAI-compatible LLM to extract and rank relevant roles against your profile, generates a Markdown report, and can sync shortlisted jobs into a Google Sheets CRM.
+
+It is intentionally simple:
+
+- no web app
+- no database
+- JSON files for raw and processed data
+- Markdown for reports
+- Google Sheets for lightweight CRM tracking
+
+## Typical Monthly Flow
+
+Use this flow when you want to analyze the full thread without missing eligible jobs, while still avoiding LLM calls for obvious mismatches.
+
+### 1. Install dependencies
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+### 2. Configure environment
+
+Copy the environment template:
+
+```bash
+cp env.example .env
+```
+
+Then edit `.env` with your LLM provider details:
+
+```bash
+LLM_API_KEY=your_api_key
+LLM_BASE_URL=https://api.fireworks.ai/inference/v1
+LLM_MODEL=accounts/fireworks/models/llama-v3p1-70b-instruct
+```
+
+For OpenAI directly, leave `LLM_BASE_URL` empty.
+
+If you want Google Sheets sync, also set:
+
+```bash
+GOOGLE_SHEET_ID=your_google_sheet_id
+GOOGLE_SHEETS_CREDENTIALS_FILE=/absolute/path/to/service-account.json
+```
+
+Share the Google Sheet with the service account email from the credentials JSON.
+
+### 3. Edit your profile
+
+Use one of:
+
+```bash
+profile.yaml
+profile.gaurav.yaml
+```
+
+The profile controls:
+
+- target roles
+- avoid roles
+- skills
+- domain preferences
+- remote and geography rules
+- compensation minimums
+- hard filters
+- LLM scoring weights
+- outreach email style
+
+Be especially careful with geography and work authorization fields. The prefilter uses them to reject region-locked roles such as Remote US, EU only, Japan only, or onsite-only jobs.
+
+### 4. Fetch the HN thread
+
+Use the HN item ID:
+
+```bash
+python3 fetch_hn.py --item-id 48747975 --month 2026-07
+```
+
+Or use the HN URL:
+
+```bash
+python3 fetch_hn.py --url "https://news.ycombinator.com/item?id=48747975" --month 2026-07
+```
+
+This writes:
+
+```text
+data/raw/hn_whos_hiring_2026-07_raw.json
+```
+
+Only top-level comments are fetched. Nested replies are ignored.
+
+### 5. Run prefilter + full analysis
+
+This is the recommended command when you are fine with token usage but still want to avoid LLM calls for clear mismatches:
+
+```bash
+python3 analyze_jobs.py \
+  --month 2026-07 \
+  --profile profile.gaurav.yaml \
+  --report-mode full \
+  --generate-outreach \
+  --yes
+```
+
+This does all of the following:
+
+1. loads the raw HN comments
+2. runs deterministic comment-level prefiltering
+3. skips obvious junior, onsite-only, wrong-geo, unpaid, and irrelevant posts before extraction
+4. extracts structured job data using the LLM
+5. applies role-level hard filters
+6. computes heuristic scores
+7. LLM-ranks every eligible role
+8. optionally generates outreach drafts for strong matches
+9. writes JSON caches and a Markdown report
+
+Outputs:
+
+```text
+data/processed/hn_whos_hiring_2026-07_prefiltered.json
+data/processed/hn_whos_hiring_2026-07_extracted.json
+data/processed/hn_whos_hiring_2026-07_matches.json
+data/reports/hn_whos_hiring_2026-07_report.md
+```
+
+Do not pass `--limit`, `--max-extractions`, or `--top-n-for-matching` if you want all eligible jobs analyzed.
+
+### 6. Sync shortlisted jobs to Google Sheets CRM
+
+Dry-run first:
+
+```bash
+python3 sync_google_sheet.py --month 2026-07 --dry-run
+```
+
+Then sync:
+
+```bash
+python3 sync_google_sheet.py --month 2026-07
+```
+
+By default, the sync imports only:
+
+- `must_apply`
+- `strong_maybe`
+- `maybe`
+
+The Google Sheet has these tabs:
+
+- `Jobs`: compact CRM view for applications and follow-ups
+- `Details`: longer AI summaries, reasons, concerns, and outreach drafts
+- `Followups`: generated list of jobs needing follow-up
+- `README`: sheet usage notes
+
+If you redesigned or regenerated the current month and want to repopulate that month's rows:
+
+```bash
+python3 sync_google_sheet.py --month 2026-07 --replace-month
+```
+
+Matching openings keep manual CRM fields such as application status, dates, notes, and follow-up data.
+
+## Files
+
+### Scripts
+
+`fetch_hn.py`
+
+Fetches the HN story and its top-level comments using the official Hacker News Firebase API.
+
+`analyze_jobs.py`
+
+Runs prefiltering, LLM extraction, hard filtering, heuristic scoring, LLM matching, outreach generation, and Markdown report generation.
+
+`sync_google_sheet.py`
+
+Syncs processed job results into a Google Sheets CRM.
+
+### Configuration
+
+`profile.yaml`
+
+Editable generic profile template.
+
+`profile.gaurav.yaml`
+
+Personalized profile file.
+
+`env.example`
+
+Environment variable template. Copy to `.env`.
+
+`.env`
+
+Local secrets and provider settings. Do not commit this file.
+
+`requirements.txt`
+
+Python dependencies.
+
+### Data Directories
+
+`data/raw/`
+
+Raw HN thread comments.
+
+`data/processed/`
+
+Prefilter results, LLM extraction cache, and match cache.
+
+`data/reports/`
+
+Generated Markdown reports.
+
+`credentials/`
+
+Optional local location for Google service account credentials. Do not commit private credentials.
+
+## Commands
+
+## `fetch_hn.py`
+
+Fetches one HN thread and saves top-level comments to `data/raw/`.
+
+### Basic usage
+
+```bash
+python3 fetch_hn.py --item-id 48747975 --month 2026-07
+```
+
+```bash
+python3 fetch_hn.py --url "https://news.ycombinator.com/item?id=48747975" --month 2026-07
+```
+
+### Options
+
+`--item-id`
+
+HN story item ID. Use either `--item-id` or `--url`.
+
+`--url`
+
+HN story URL. The script extracts the `id` from the URL.
+
+`--month`
+
+Required. Used in the output filename. Format: `YYYY-MM`.
+
+`--delay`
+
+Delay between comment fetches, in seconds. Default is `0.05`.
+
+Use a larger delay if you want to be extra gentle with the API:
+
+```bash
+python3 fetch_hn.py --item-id 48747975 --month 2026-07 --delay 0.2
+```
+
+`--output-dir`
+
+Where raw JSON should be written. Default is `data/raw`.
+
+```bash
+python3 fetch_hn.py --item-id 48747975 --month 2026-07 --output-dir data/raw
+```
+
+## `analyze_jobs.py`
+
+Analyzes raw HN comments and writes processed JSON plus a Markdown report.
+
+### Recommended full analysis with prefilter
+
+```bash
+python3 analyze_jobs.py \
+  --month 2026-07 \
+  --profile profile.gaurav.yaml \
+  --report-mode full \
+  --generate-outreach \
+  --yes
+```
+
+This still runs prefiltering. It does not spend LLM calls on clear mismatches.
+
+### Quick test run without LLM
+
+```bash
+python3 analyze_jobs.py \
+  --month 2026-07 \
+  --profile profile.gaurav.yaml \
+  --dry-run
+```
+
+Dry-run uses heuristics instead of real LLM extraction and ranking. Use it to check plumbing, not final decisions.
+
+### Prefilter only
+
+```bash
+python3 analyze_jobs.py \
+  --month 2026-07 \
+  --profile profile.gaurav.yaml \
+  --prefilter-only
+```
+
+This writes the prefilter JSON and exits before any LLM calls.
+
+### Budgeted run
+
+```bash
+python3 analyze_jobs.py \
+  --month 2026-07 \
+  --profile profile.gaurav.yaml \
+  --max-extractions 100 \
+  --top-n-for-matching 40
+```
+
+Use this when you want to control token usage.
+
+### Fresh rerun
+
+```bash
+python3 analyze_jobs.py \
+  --month 2026-07 \
+  --profile profile.gaurav.yaml \
+  --force-extract \
+  --force-match \
+  --generate-outreach \
+  --yes
+```
+
+Use this after changing prompts, filters, profile preferences, or scoring logic.
+
+### Options
+
+`--month`
+
+Required unless using `--self-test`. Chooses the input and output filenames.
+
+`--profile`
+
+Required unless using `--self-test`. Path to the YAML profile.
+
+`--raw-file`
+
+Use a specific raw JSON file instead of the default monthly file.
+
+```bash
+python3 analyze_jobs.py --month 2026-07 --profile profile.gaurav.yaml --raw-file data/raw/hn_whos_hiring_2026-07_raw.json
+```
+
+`--limit`
+
+Limits raw comments before prefiltering. This is mainly for testing.
+
+```bash
+python3 analyze_jobs.py --month 2026-07 --profile profile.gaurav.yaml --limit 20
+```
+
+`--max-extractions`
+
+Limits how many prefilter-surviving comments are sent to the LLM for extraction.
+
+`--top-n-for-matching`
+
+Limits how many eligible roles are sent to the LLM for matching after hard filters and heuristic sorting.
+
+`--force-extract`
+
+Ignores extraction cache and re-extracts comments.
+
+`--force-match`
+
+Ignores match cache and re-ranks jobs.
+
+`--generate-outreach`
+
+Generates outreach email drafts for `must_apply` jobs or jobs with score `>= 85`.
+
+`--report-mode shortlist`
+
+Default. Produces a readable report with full detail for higher-priority jobs and compact sections for lower-priority jobs.
+
+```bash
+python3 analyze_jobs.py --month 2026-07 --profile profile.gaurav.yaml --report-mode shortlist
+```
+
+`--report-mode full`
+
+Produces a more detailed report for review and debugging.
+
+`--include-deprioritized`
+
+Includes comments that the prefilter marked as deprioritized. Useful if you think the prefilter is being too strict.
+
+`--prefilter-only`
+
+Runs only the comment-level prefilter and exits before LLM calls.
+
+`--dry-run`
+
+Runs without LLM calls or LLM environment variables. Produces heuristic fake extraction and matching results.
+
+`--show-heuristic-details`
+
+Prints the top heuristic-ranked jobs and their positive/negative signals before matching.
+
+`--yes`
+
+Skips confirmation if the run will make more than 50 new LLM calls.
+
+`--self-test`
+
+Runs local tests for JSON parsing, filters, salary parsing, geo matching, scoring helpers, and related logic.
+
+```bash
+python3 analyze_jobs.py --self-test
+```
+
+## `sync_google_sheet.py`
+
+Syncs analyzed jobs into Google Sheets.
+
+### Basic usage
+
+```bash
+python3 sync_google_sheet.py --month 2026-07
+```
+
+This uses `GOOGLE_SHEET_ID` and `GOOGLE_SHEETS_CREDENTIALS_FILE` from `.env`.
+
+You can also pass them explicitly:
+
+```bash
+python3 sync_google_sheet.py \
+  --month 2026-07 \
+  --spreadsheet-id your_google_sheet_id \
+  --credentials-file /absolute/path/to/service-account.json
+```
+
+### Dry-run
+
+```bash
+python3 sync_google_sheet.py --month 2026-07 --dry-run
+```
+
+Computes what would be imported without writing to Google Sheets.
+
+### Repopulate one month
+
+```bash
+python3 sync_google_sheet.py --month 2026-07 --replace-month
+```
+
+This removes stale rows associated with the current month and re-adds the latest report rows. Existing matching openings keep manual CRM fields.
+
+### Include lower-priority jobs
+
+Include weak fits:
+
+```bash
+python3 sync_google_sheet.py --month 2026-07 --include-weak-fit
+```
+
+Include skips, hard-filtered jobs, and not-LLM-ranked jobs:
+
+```bash
+python3 sync_google_sheet.py --month 2026-07 --include-skips
+```
+
+### Options
+
+`--month`
+
+Required unless using `--self-test`. Selects the month to sync.
+
+`--spreadsheet-id`
+
+Google Sheet ID. Optional if `GOOGLE_SHEET_ID` is set in `.env`.
+
+`--credentials-file`
+
+Google service account JSON file. Optional if `GOOGLE_SHEETS_CREDENTIALS_FILE` is set in `.env`.
+
+`--raw-file`
+
+Override the raw HN JSON file.
+
+`--extracted-file`
+
+Override the extracted jobs JSON file.
+
+`--matches-file`
+
+Override the matches JSON file.
+
+`--dry-run`
+
+Shows planned changes without writing to Google Sheets.
+
+`--replace-month`
+
+Repopulates rows for the selected month from the latest processed JSON.
+
+`--include-weak-fit`
+
+Also syncs jobs with bucket `weak_fit`.
+
+`--include-skips`
+
+Also syncs skipped, hard-filtered, and not-LLM-ranked jobs.
+
+`--self-test`
+
+Runs local tests for key generation and merge behavior.
+
+```bash
+python3 sync_google_sheet.py --self-test
+```
+
+## Google Sheets CRM Notes
+
+The sync creates or updates these tabs:
+
+`Jobs`
+
+Main CRM view. Company is first, followed by title, score, heuristic score, location, remote status, salary, tech stack, application tracking fields, source links, and housekeeping fields.
+
+`Details`
+
+Longer AI-generated fields, including summary, positive reasons, concerns, missing information, hard-filter reasons, and outreach drafts.
+
+`Followups`
+
+Generated view of rows where follow-up is needed or due.
+
+`README`
+
+Explains the sheet layout and which columns are auto-managed.
+
+Manual CRM columns are preserved on sync:
+
+- `application_status`
+- `application_date`
+- `application_channel`
+- `last_contacted_on`
+- `response_status`
+- `response_date`
+- `followup_needed`
+- `followup_date`
+- `next_action`
+- `contact_name`
+- `contact_email`
+- `notes`
+- `do_not_apply`
+
+## Common Recipes
+
+### Analyze everything eligible, but still skip obvious mismatches
+
+```bash
+python3 analyze_jobs.py --month 2026-07 --profile profile.gaurav.yaml --report-mode full --generate-outreach --yes
+```
+
+### Spend fewer tokens
+
+```bash
+python3 analyze_jobs.py --month 2026-07 --profile profile.gaurav.yaml --max-extractions 80 --top-n-for-matching 30
+```
+
+### Debug prefilter decisions
+
+```bash
+python3 analyze_jobs.py --month 2026-07 --profile profile.gaurav.yaml --prefilter-only
+```
+
+Then inspect:
+
+```text
+data/processed/hn_whos_hiring_2026-07_prefiltered.json
+```
+
+### Debug heuristic ranking
+
+```bash
+python3 analyze_jobs.py --month 2026-07 --profile profile.gaurav.yaml --show-heuristic-details --top-n-for-matching 20
+```
+
+### Re-run after changing the profile
+
+```bash
+python3 analyze_jobs.py --month 2026-07 --profile profile.gaurav.yaml --force-match --generate-outreach --yes
+```
+
+### Re-run after changing extraction prompts
+
+```bash
+python3 analyze_jobs.py --month 2026-07 --profile profile.gaurav.yaml --force-extract --force-match --generate-outreach --yes
+```
+
+### Sync only good opportunities to CRM
+
+```bash
+python3 sync_google_sheet.py --month 2026-07
+```
+
+### Sync a broader review list
+
+```bash
+python3 sync_google_sheet.py --month 2026-07 --include-weak-fit
+```
+
+## Safety Notes
+
+- `.env` contains secrets. Do not commit it.
+- Google service account JSON files contain secrets. Do not commit them.
+- The LLM is instructed not to hallucinate, but you should still verify important facts before applying.
+- Hard filters are conservative. Ambiguous cases should usually go to LLM ranking instead of being rejected early.
+- Cached JSON results are reused when comment/job hashes match. Use `--force-extract` or `--force-match` when you intentionally want fresh LLM results.
