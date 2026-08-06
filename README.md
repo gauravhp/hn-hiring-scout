@@ -112,12 +112,12 @@ Only top-level comments are fetched. Nested replies are ignored.
 
 ### 5. Run prefilter + full analysis
 
-This is the recommended command when you are fine with token usage but still want to avoid LLM calls for clear mismatches:
+This is the recommended command when you are fine with token usage but still want to avoid LLM calls for clear mismatches (change XXXXX with your profile yaml name): 
 
 ```bash
 python3 analyze_jobs.py \
   --month 2026-07 \
-  --profile profile.gaurav.yaml \
+  --profile profile.XXXXX.yaml \
   --report-mode full \
   --generate-outreach \
   --yes
