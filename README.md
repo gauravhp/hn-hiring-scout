@@ -71,7 +71,6 @@ You can also edit a profile manually. Use one of:
 
 ```bash
 profile.yaml
-profile.gaurav.yaml
 profile.generated.yaml
 ```
 
