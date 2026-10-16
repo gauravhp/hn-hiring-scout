@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import os
 import re
@@ -97,6 +99,12 @@ class ExtractedDocument:
         return len(self.text)
 
 
+@dataclass(frozen=True)
+class OptionalQuestion:
+    key: str
+    prompt: str
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate a validated HN Hiring Scout profile YAML from candidate documents."
@@ -154,7 +162,29 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--include-evidence-section",
         action="store_true",
-        help="Include an evidence_profile section with short source-backed notes.",
+        default=True,
+        help="Include an evidence_profile section with short source-backed notes. Enabled by default.",
+    )
+    parser.add_argument(
+        "--no-evidence-section",
+        action="store_false",
+        dest="include_evidence_section",
+        help="Do not include the optional evidence_profile section.",
+    )
+    parser.add_argument(
+        "--ask-questions",
+        action="store_true",
+        help="Ask optional skippable questions for links, location, authorization, and compensation.",
+    )
+    parser.add_argument(
+        "--no-questions",
+        action="store_true",
+        help="Do not ask optional questions, even in an interactive terminal.",
+    )
+    parser.add_argument(
+        "--context-file",
+        type=Path,
+        help="Optional JSON or YAML file with user-supplied context to merge into the prompt.",
     )
     args = parser.parse_args()
 
@@ -318,6 +348,105 @@ def load_yaml_file(path: Path) -> JsonDict:
     if not isinstance(data, dict):
         raise GenerateProfileError(f"Expected top-level YAML mapping in {path}.")
     return data
+
+
+def load_context_file(path: Path) -> JsonDict:
+    if not path.exists():
+        raise GenerateProfileError(f"Context file does not exist: {path}")
+    suffix = path.suffix.lower()
+    try:
+        if suffix == ".json":
+            data = json.loads(path.read_text(encoding="utf-8"))
+        else:
+            if yaml is None:
+                raise GenerateProfileError("Missing required package: PyYAML.")
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))  # type: ignore[union-attr]
+    except json.JSONDecodeError as exc:
+        raise GenerateProfileError(f"Invalid context file {path}: {exc}") from exc
+    except Exception as exc:
+        if isinstance(exc, GenerateProfileError):
+            raise
+        raise GenerateProfileError(f"Invalid context file {path}: {exc}") from exc
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        raise GenerateProfileError(f"Expected top-level mapping/object in context file: {path}")
+    return data
+
+
+def should_ask_optional_questions(args: argparse.Namespace) -> bool:
+    if args.no_questions:
+        return False
+    if args.ask_questions:
+        return True
+    return sys.stdin.isatty() and not args.dry_run
+
+
+def collect_optional_context(*, force: bool) -> JsonDict:
+    if not force:
+        try:
+            answer = input("Add optional profile context now? [y/N] ").strip().lower()
+        except EOFError:
+            return {}
+        if answer not in {"y", "yes"}:
+            print("Skipping optional profile questions.")
+            return {}
+
+    print("Optional questions. Press Enter to skip any field, or type 'skip all' to stop.")
+    questions = [
+        OptionalQuestion("name", "Name"),
+        OptionalQuestion("email", "Email"),
+        OptionalQuestion("website", "Website"),
+        OptionalQuestion("linkedin", "LinkedIn URL"),
+        OptionalQuestion("github", "GitHub URL"),
+        OptionalQuestion("country", "Country"),
+        OptionalQuestion("region", "State/region"),
+        OptionalQuestion("city", "City"),
+        OptionalQuestion("timezone", "Timezone, for example Asia/Kolkata or UTC+5:30"),
+        OptionalQuestion("current_status", "Current status"),
+        OptionalQuestion("work_authorization", "Work authorization / contractor setup"),
+        OptionalQuestion("can_work_in_us", "Can work in US? true/false"),
+        OptionalQuestion("can_work_in_eu", "Can work in EU? true/false"),
+        OptionalQuestion("can_work_in_uk", "Can work in UK? true/false"),
+        OptionalQuestion("requires_visa_sponsorship", "Requires visa sponsorship? true/false"),
+        OptionalQuestion("minimum_base_usd", "Minimum base USD"),
+        OptionalQuestion("desired_base_usd", "Desired base USD"),
+        OptionalQuestion("minimum_hourly_usd", "Minimum hourly USD"),
+    ]
+    context: JsonDict = {}
+    for question in questions:
+        try:
+            raw = input(f"{question.prompt}: ").strip()
+        except EOFError:
+            break
+        if raw.lower() in {"skip all", "skip-all", "skip_all"}:
+            break
+        if not raw:
+            continue
+        context[question.key] = parse_optional_answer(raw)
+    return context
+
+
+def parse_optional_answer(value: str) -> Any:
+    lowered = value.strip().lower()
+    if lowered in {"true", "yes", "y"}:
+        return True
+    if lowered in {"false", "no", "n"}:
+        return False
+    if re.fullmatch(r"\d+(?:\.\d+)?", value.strip()):
+        number = float(value.strip())
+        return int(number) if number.is_integer() else number
+    return value.strip()
+
+
+def merge_context(*contexts: JsonDict) -> JsonDict:
+    merged: JsonDict = {}
+    for context in contexts:
+        for key, value in context.items():
+            if value is None or value == "":
+                continue
+            merged[key] = value
+    return merged
 
 
 def discover_input_files(inputs: list[Path], *, max_file_bytes: int) -> list[Path]:
@@ -523,8 +652,10 @@ def summarize_large_evidence(*, client: Any, model: str, evidence: str, max_char
 def summary_system_prompt() -> str:
     return (
         "You summarize candidate career evidence for a profile generator. "
-        "Use only the supplied text. Preserve concrete skills, domains, role scope, achievements, "
-        "locations, work authorization statements, links, compensation hints, and job preferences. "
+        "Use only the supplied text. Preserve concrete skills, employers, domains, role scope, "
+        "achievements, metrics, architecture ownership, leadership scope, locations, work authorization "
+        "statements, links, compensation hints, and job preferences. Keep enough detail to generate a "
+        "senior/staff-level job-search profile, including named companies and case-study outcomes. "
         "Do not invent facts. Return JSON only."
     )
 
@@ -532,7 +663,7 @@ def summary_system_prompt() -> str:
 def summary_user_prompt(*, chunk: str, index: int, total: int) -> str:
     return (
         f"Summarize evidence chunk {index} of {total} for generating an HN Hiring Scout profile.\n"
-        "Return JSON with exactly this shape:\n"
+        "Return JSON with exactly this shape. The summary may use compact headings and bullets inside the string:\n"
         '{ "summary": "..." }\n\n'
         "Evidence chunk:\n"
         f"{chunk}"
@@ -542,7 +673,8 @@ def summary_user_prompt(*, chunk: str, index: int, total: int) -> str:
 def profile_system_prompt() -> str:
     return (
         "You generate profile YAML data for HN Hiring Scout, a local job-search tool. "
-        "Use only the evidence supplied by the user and the template schema. "
+        "Generate a comprehensive, evidence-backed senior engineering profile, not a sparse template fill. "
+        "Use only the evidence and optional user context supplied by the user plus the template schema. "
         "Do not hallucinate personal links, work authorization, dates, employers, compensation, or credentials. "
         "Use placeholders such as EDIT_ME or null when evidence is missing. "
         "Return valid JSON only."
@@ -553,6 +685,7 @@ def profile_user_prompt(
     *,
     template: JsonDict,
     evidence: str,
+    user_context: JsonDict,
     include_private_links: bool,
     include_evidence_section: bool,
 ) -> str:
@@ -564,21 +697,34 @@ def profile_user_prompt(
     link_instruction = (
         "You may populate personal links only when they are explicitly present in the evidence."
         if include_private_links
-        else "Do not populate personal links; keep link values as placeholders or null unless the template already has placeholders."
+        else "Do not populate personal links from documents; use links only if they are provided in optional user context, otherwise keep placeholders or null."
     )
     return (
         "Generate a candidate profile JSON object that matches this YAML template schema exactly.\n\n"
+        "Quality target:\n"
+        "- The output should be production-ready for ranking Hacker News jobs, comparable to a carefully hand-written senior engineer profile.\n"
+        "- Prefer specific, concrete language over generic phrases.\n"
+        "- When the evidence supports it, include named employers, product/company contexts, measurable outcomes, architecture ownership, rescue/turnaround work, and leadership scope.\n"
+        "- Populate target roles, avoid roles, skills, domains, work preferences, outreach, and feedback preferences comprehensively.\n"
+        "- Keep lists rich but relevant: strongest skills should be selective; comfortable skills may be broader; avoid/not-primary should be useful for filtering.\n\n"
         "Rules:\n"
         "- Preserve every top-level key from the template.\n"
         "- Preserve nested dictionary/list shapes from the template.\n"
-        "- Fill values using only the evidence below.\n"
+        "- Fill values using only the evidence and optional user context below.\n"
+        "- Optional user context has priority over document evidence when they conflict.\n"
         "- Use EDIT_ME or null for missing geography, work authorization, compensation, private links, or preferences.\n"
         "- Make job-search preferences practical and ruthless for senior software engineering roles.\n"
         "- scoring_weights must sum to 100.\n"
         "- candidate geography and work authorization fields must be present and explicit.\n"
         "- Distinguish strongest skills from skills that are merely mentioned.\n"
+        "- Tune scoring weights to the candidate's situation instead of blindly copying the template, while preserving the same keys and sum of 100.\n"
+        "- If the candidate is outside the US/EU/UK or likely needs sponsorship, make remote/location fit more important and configure eligible/ineligible remote regions conservatively.\n"
+        "- Outreach points should be specific to this candidate's strongest evidence, not generic full-stack boilerplate.\n"
+        "- evidence_profile, when requested, should include short source-backed highlights grouped into resume_highlights and case_study_highlights when applicable.\n"
         f"- {link_instruction}\n"
         f"- {evidence_instruction}\n\n"
+        "Optional user context JSON:\n"
+        f"{json.dumps(user_context, indent=2, ensure_ascii=False)}\n\n"
         "Template JSON:\n"
         f"{json.dumps(template, indent=2, ensure_ascii=False)}\n\n"
         "Evidence:\n"
@@ -591,6 +737,73 @@ def normalize_profile(profile: JsonDict, template: JsonDict) -> JsonDict:
     if "scoring_weights" in normalized:
         normalized["scoring_weights"] = normalize_scoring_weights(normalized["scoring_weights"])
     return normalized
+
+
+def apply_user_context(profile: JsonDict, context: JsonDict) -> JsonDict:
+    if not context:
+        return profile
+    candidate = profile.setdefault("candidate", {})
+    if not isinstance(candidate, dict):
+        candidate = {}
+        profile["candidate"] = candidate
+    links = candidate.setdefault("links", {})
+    if not isinstance(links, dict):
+        links = {}
+        candidate["links"] = links
+
+    candidate_fields = {
+        "name",
+        "country",
+        "region",
+        "city",
+        "timezone",
+        "current_status",
+        "work_authorization",
+        "can_work_in_us",
+        "can_work_in_eu",
+        "can_work_in_uk",
+        "requires_visa_sponsorship",
+    }
+    link_fields = {"email", "website", "linkedin", "github", "resume"}
+    compensation_fields = {
+        "minimum_base_usd",
+        "desired_base_usd",
+        "minimum_hourly_usd",
+        "minimum_contract_rate_usd_per_hour",
+    }
+
+    for key in candidate_fields:
+        if key in context:
+            candidate[key] = context[key]
+    for key in link_fields:
+        if key in context:
+            links[key] = normalize_url_if_needed(key, context[key])
+
+    if any(key in context for key in ("city", "region", "country")):
+        parts = [
+            str(context.get("city", "")).strip(),
+            str(context.get("region", "")).strip(),
+            str(context.get("country", "")).strip(),
+        ]
+        location = ", ".join(part for part in parts if part)
+        if location:
+            candidate["location"] = location
+
+    compensation = profile.setdefault("compensation", {})
+    if isinstance(compensation, dict):
+        for key in compensation_fields:
+            if key in context:
+                compensation[key] = context[key]
+    return profile
+
+
+def normalize_url_if_needed(key: str, value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    stripped = value.strip()
+    if key in {"website", "linkedin", "github", "resume"} and stripped and not re.match(r"^https?://", stripped):
+        return "https://" + stripped.lstrip("/")
+    return stripped
 
 
 def normalize_against_template(value: Any, template: Any) -> Any:
@@ -672,6 +885,11 @@ def validate_generated_profile(
     validate_candidate_geo(profile, errors=errors)
     validate_scoring_weights(profile, errors=errors)
 
+    if include_evidence_section:
+        evidence_profile = profile.get("evidence_profile")
+        if not isinstance(evidence_profile, dict) or not evidence_profile:
+            errors.append("missing or empty evidence_profile section")
+
     if "evidence_profile" in profile and not include_evidence_section and "evidence_profile" not in template:
         errors.append("unexpected top-level key: evidence_profile")
 
@@ -738,6 +956,7 @@ def generate_profile(
     model: str,
     template: JsonDict,
     evidence: str,
+    user_context: JsonDict,
     include_private_links: bool,
     include_evidence_section: bool,
 ) -> JsonDict:
@@ -748,6 +967,7 @@ def generate_profile(
         user_prompt=profile_user_prompt(
             template=template,
             evidence=evidence,
+            user_context=user_context,
             include_private_links=include_private_links,
             include_evidence_section=include_evidence_section,
         ),
@@ -817,7 +1037,8 @@ def run_self_test() -> int:
             binary_path = tmp / "image.bin"
             binary_path.write_bytes(b"\x00\x01\x02\x03")
 
-            docs = extract_documents(discover_input_files([tmp], max_file_bytes=DEFAULT_MAX_FILE_BYTES))
+            with contextlib.redirect_stderr(io.StringIO()):
+                docs = extract_documents(discover_input_files([tmp], max_file_bytes=DEFAULT_MAX_FILE_BYTES))
             usable_names = {doc.path.name for doc in docs if doc.text.strip()}
             if "resume.txt" not in usable_names or "case.md" not in usable_names:
                 failures.append("text extraction self-test did not include expected files")
@@ -889,6 +1110,12 @@ def main() -> int:
 
     ensure_dependencies(dry_run=args.dry_run)
     template = load_yaml_file(args.template)
+    file_context = load_context_file(args.context_file) if args.context_file else {}
+    asked_context = collect_optional_context(force=args.ask_questions) if should_ask_optional_questions(args) else {}
+    user_context = merge_context(file_context, asked_context)
+    if user_context:
+        print(f"Using {len(user_context)} user-supplied context field(s).")
+
     files = discover_input_files(args.inputs, max_file_bytes=args.max_file_bytes)
     if not files:
         raise GenerateProfileError("No readable input files found.")
@@ -919,10 +1146,12 @@ def main() -> int:
         model=model,
         template=template,
         evidence=prepared_evidence,
+        user_context=user_context,
         include_private_links=args.include_private_links,
         include_evidence_section=args.include_evidence_section,
     )
     profile = normalize_profile(raw_profile, template)
+    profile = apply_user_context(profile, user_context)
     errors = validate_generated_profile(
         profile,
         template,

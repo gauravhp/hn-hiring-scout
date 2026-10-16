@@ -1,14 +1,13 @@
 # HN Hiring Scout
 
-HN Hiring Scout is a local Python tool for scanning Hacker News "Who is Hiring?" threads. It fetches top-level HN job posts, prefilters obvious mismatches, uses an OpenAI-compatible LLM to extract and rank relevant roles against your profile, generates a Markdown report, and can sync shortlisted jobs into a Google Sheets CRM.
+HN Hiring Scout is a local Python tool for scanning Hacker News "Who is Hiring?" threads. It fetches top-level HN job posts, prefilters obvious mismatches, uses an OpenAI-compatible LLM to extract and rank relevant roles against your profile, generates a Markdown report, and can sync shortlisted jobs into a Google Sheets CRM. An optional local Streamlit dashboard can ingest those reports into PostgreSQL for interactive review and company moderation.
 
 It is intentionally simple:
 
-- no web app
-- no database
 - JSON files for raw and processed data
 - Markdown for reports
 - Google Sheets for lightweight CRM tracking
+- optional local PostgreSQL + Streamlit dashboard
 
 ## Typical Monthly Flow
 
@@ -16,9 +15,16 @@ Use this flow when you want to analyze the full thread without missing eligible 
 
 ### 1. Install dependencies
 
+A virtual environment is recommended:
+
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install --upgrade pip
 python3 -m pip install -r requirements.txt
 ```
+
+The requirements file includes the PostgreSQL driver and Streamlit dependencies used by the optional dashboard.
 
 ### 2. Configure environment
 
@@ -55,7 +61,8 @@ If you want to generate a draft profile from your resume, case studies, notes, o
 python3 generate_profile.py \
   --input "/path/to/resume.pdf" \
   --input "/path/to/case-studies" \
-  --output profile.generated.yaml
+  --output profile.generated.yaml \
+  --ask-questions
 ```
 
 Preview what files will be read without calling the LLM:
@@ -64,7 +71,7 @@ Preview what files will be read without calling the LLM:
 python3 generate_profile.py --input ~/Career_Profile --dry-run
 ```
 
-The generator sends extracted document text to your configured LLM provider. Review the generated geography, work authorization, compensation, and hard filters before using the profile for job analysis.
+The optional questions are skippable and help fill fields that resumes often omit, such as LinkedIn, GitHub, website, email, location, timezone, work authorization, and compensation. The generator sends extracted document text to your configured LLM provider. Review the generated geography, work authorization, compensation, and hard filters before using the profile for job analysis.
 
 You can also edit a profile manually. Use one of:
 
@@ -146,6 +153,28 @@ data/reports/hn_whos_hiring_2026-07_report.md
 
 Do not pass `--limit`, `--max-extractions`, or `--top-n-for-matching` if you want all eligible jobs analyzed.
 
+### Recover from an LLM provider failure
+
+The analyzer now stops immediately if an extraction or matching request fails. Its error
+message includes the operation, comment/job ID, model, base URL, HTTP status, and provider
+request ID when available. A `404` means the configured `LLM_MODEL` is not available at the
+configured `LLM_BASE_URL` for the current API key; correct the provider configuration before
+retrying.
+
+To discard only the generated artifacts for one month and start its analysis again, while
+preserving the fetched raw HN input, use:
+
+```bash
+python3 analyze_jobs.py \
+  --month 2026-09 \
+  --profile profile.gaurav.yaml \
+  --clear-analysis \
+  --yes
+```
+
+`--clear-analysis` removes that month's prefilter, extraction cache, match cache, and report.
+It never deletes `data/raw/`.
+
 ### 6. Sync shortlisted jobs to Google Sheets CRM
 
 Dry-run first:
@@ -181,6 +210,33 @@ python3 sync_google_sheet.py --month 2026-07 --replace-month
 
 Matching openings keep manual CRM fields such as application status, dates, notes, and follow-up data.
 
+### 7. Optional: view reports in the local dashboard
+
+The dashboard imports a generated Markdown report into a local PostgreSQL database and provides filtering, report selection, company banning, and application links through Streamlit. Run these commands from the repository root with the virtual environment from step 1 activated.
+
+1. Ensure a local PostgreSQL server is running. From a PostgreSQL role that can create databases, initialize a **fresh** dashboard database:
+
+   ```bash
+   psql -h localhost -d postgres -f hiring-dashboard/schema/tables.sql
+   ```
+
+   The provided schema already creates and connects to the `hiring_scout` database; do not run a separate `CREATE DATABASE` command or copy the schema into another file. Because the schema starts with `CREATE DATABASE`, this command is only for first-time setup.
+2. Set the same `DB_CONFIG` values in `hiring-dashboard/injest.py` and `hiring-dashboard/app.py` to match your PostgreSQL user, password, host, and port. The default database name is `hiring_scout`.
+3. Ingest a generated report directly from `data/reports/`:
+
+   ```bash
+   python3 hiring-dashboard/injest.py data/reports/hn_whos_hiring_2026-07_report.md
+   ```
+
+   Re-ingesting later reports updates the latest job details and records reposts. The ingester accepts both detailed and compact report sections.
+4. Start the dashboard:
+
+   ```bash
+   streamlit run hiring-dashboard/app.py
+   ```
+
+   Streamlit prints a local URL, normally `http://localhost:8501`; open it in a browser if it does not open automatically. Use the sidebar to filter by report, recommendation bucket, score, and search text. You can ban or unban companies directly from the dashboard.
+
 ## Files
 
 ### Scripts
@@ -200,6 +256,18 @@ Generates a validated profile YAML from resumes, case studies, notes, PDFs, text
 `sync_google_sheet.py`
 
 Syncs processed job results into a Google Sheets CRM.
+
+`hiring-dashboard/injest.py`
+
+Imports a generated Markdown report into the local PostgreSQL dashboard database.
+
+`hiring-dashboard/app.py`
+
+Runs the Streamlit dashboard for filtering jobs and managing company bans.
+
+`hiring-dashboard/schema/tables.sql`
+
+Creates the local PostgreSQL database tables and indexes used by the dashboard.
 
 ### Configuration
 
@@ -311,11 +379,50 @@ Overwrite the output file if it already exists.
 
 `--include-private-links`
 
-Allows the LLM to populate personal links found in the documents. By default, links stay as placeholders or null.
+Allows the LLM to populate personal links found in the documents. By default, links stay as placeholders or null unless you provide them through optional questions or a context file.
 
 `--include-evidence-section`
 
-Adds an `evidence_profile` section with short source-backed notes.
+Adds an `evidence_profile` section with short source-backed notes. This is enabled by default because it makes the generated profile more grounded and useful.
+
+`--no-evidence-section`
+
+Disables the optional `evidence_profile` section.
+
+`--ask-questions`
+
+Asks skippable questions for fields that documents often miss, such as LinkedIn, GitHub, website, email, location, timezone, work authorization, and compensation. Press Enter to skip a field, or type `skip all`.
+
+```bash
+python3 generate_profile.py --input ~/Career_Profile --output profile.generated.yaml --ask-questions
+```
+
+`--no-questions`
+
+Skips optional questions even when running in an interactive terminal.
+
+`--context-file`
+
+Loads optional user-supplied context from a JSON or YAML file. This is useful when you want repeatable profile generation without answering questions every time.
+
+Example context file:
+
+```yaml
+name: "Your Name"
+email: "you@example.com"
+website: "https://example.com"
+linkedin: "https://www.linkedin.com/in/example/"
+github: "https://github.com/example"
+country: "India"
+region: "Gujarat"
+city: "Ahmedabad"
+timezone: "Asia/Kolkata"
+can_work_in_us: false
+can_work_in_eu: false
+can_work_in_uk: false
+requires_visa_sponsorship: true
+work_authorization: "authorized to work in India; open to remote contractor roles globally"
+```
 
 `--self-test`
 
@@ -327,7 +434,7 @@ python3 generate_profile.py --self-test
 
 ### Schema safety
 
-`generate_profile.py` treats `profile.yaml` as the live schema. It validates that generated profiles keep the same top-level sections and nested shapes, preserve geography/work authorization fields, and keep `scoring_weights` summed to 100. If `profile.yaml` changes and the generated result no longer matches, the run fails before writing the profile.
+`generate_profile.py` treats `profile.yaml` as the live schema. It validates that generated profiles keep the same top-level sections and nested shapes, preserve geography/work authorization fields, include `evidence_profile` by default, and keep `scoring_weights` summed to 100. If `profile.yaml` changes and the generated result no longer matches, the run fails before writing the profile.
 
 Document contents are sent to your configured LLM provider. Review generated geography, work authorization, compensation, and hard filters before using the profile for analysis.
 
@@ -483,6 +590,10 @@ Ignores extraction cache and re-extracts comments.
 `--force-match`
 
 Ignores match cache and re-ranks jobs.
+
+`--clear-analysis`
+
+Deletes the selected month's generated prefilter, extraction, match, and report files before running again. It preserves the raw HN input in `data/raw/`.
 
 `--generate-outreach`
 
@@ -670,7 +781,7 @@ Manual CRM columns are preserved on sync:
 ### Generate a profile from all career documents
 
 ```bash
-python3 generate_profile.py --input ~/Career_Profile --output profile.generated.yaml
+python3 generate_profile.py --input ~/Career_Profile --output profile.generated.yaml --ask-questions
 ```
 
 Then review `profile.generated.yaml` before using it:

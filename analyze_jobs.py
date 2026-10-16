@@ -107,6 +107,14 @@ def parse_args() -> argparse.Namespace:
         help="Ignore matching job score cache entries and re-score jobs.",
     )
     parser.add_argument(
+        "--clear-analysis",
+        action="store_true",
+        help=(
+            "Delete this month's prefilter, extraction, match, and report outputs before "
+            "running. The raw HN input is preserved."
+        ),
+    )
+    parser.add_argument(
         "--generate-outreach",
         action="store_true",
         help="Generate cached outreach emails for must-apply or score >= 85 jobs.",
@@ -209,6 +217,26 @@ def report_path(month: str) -> Path:
     return REPORTS_DIR / f"hn_whos_hiring_{month}_report.md"
 
 
+def analysis_output_paths(month: str) -> list[Path]:
+    """Return the generated artifacts that can safely be rebuilt from raw input."""
+    return [
+        prefilter_cache_path(month),
+        extraction_cache_path(month),
+        match_cache_path(month),
+        report_path(month),
+    ]
+
+
+def clear_analysis_outputs(month: str) -> list[Path]:
+    """Remove generated monthly artifacts while intentionally preserving raw input."""
+    removed: list[Path] = []
+    for path in analysis_output_paths(month):
+        if path.exists():
+            path.unlink()
+            removed.append(path)
+    return removed
+
+
 def read_json_file(path: Path) -> JsonDict:
     if not path.exists():
         raise AnalyzeError(f"JSON file does not exist: {path}")
@@ -305,6 +333,38 @@ def make_client(*, dry_run: bool) -> tuple[Any | None, str | None]:
     if base_url:
         return OpenAI(api_key=api_key, base_url=base_url), model
     return OpenAI(api_key=api_key), model
+
+
+def configured_llm_base_url(client: Any) -> str:
+    base_url = getattr(client, "base_url", None)
+    return str(base_url).rstrip("/") if base_url else "OpenAI default"
+
+
+def exception_detail(exc: Exception) -> str:
+    """Format provider errors with useful, non-secret diagnostics."""
+    parts = [f"{type(exc).__name__}: {exc}"]
+    status_code = getattr(exc, "status_code", None)
+    if status_code is not None:
+        parts.append(f"HTTP status: {status_code}")
+
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    if headers:
+        request_id = headers.get("x-request-id") or headers.get("request-id")
+        if request_id:
+            parts.append(f"request ID: {request_id}")
+    return "; ".join(parts)
+
+
+def response_format_is_unsupported(exc: Exception) -> bool:
+    """Allow the compatibility fallback only for an unsupported JSON-mode option."""
+    status_code = getattr(exc, "status_code", None)
+    message = str(exc).lower()
+    return status_code in {400, 422} and (
+        "response_format" in message
+        or "json_object" in message
+        or "json mode" in message
+    )
 
 
 def preview_text(text: str, *, max_chars: int = 240) -> str:
@@ -406,7 +466,14 @@ def chat_json(
             **kwargs,
             response_format={"type": "json_object"},
         )
-    except Exception:
+    except Exception as exc:
+        if not response_format_is_unsupported(exc):
+            raise
+        print(
+            "LLM warning: provider does not accept response_format=json_object; "
+            "retrying without JSON mode.",
+            file=sys.stderr,
+        )
         response = client.chat.completions.create(**kwargs)
 
     content = response.choices[0].message.content
@@ -824,14 +891,19 @@ def extract_comments(
                 extraction = normalize_extraction(parsed)
                 source = "llm"
             except LLMJsonParseError as exc:
-                raw_content = exc.raw_content
-                extraction = normalize_extraction({"is_job_post": False, "roles": []})
-                source = "llm_error"
-                parse_error = str(exc)
+                raise AnalyzeError(
+                    f"LLM extraction returned invalid JSON for comment {comment_id}. "
+                    f"Model: {model}. {exc}"
+                ) from exc
             except Exception as exc:
-                extraction = normalize_extraction({"is_job_post": False, "roles": []})
-                source = "llm_error"
-                parse_error = str(exc)
+                raise AnalyzeError(
+                    f"LLM extraction request failed for comment {comment_id}. "
+                    f"Model: {model}. Base URL: {configured_llm_base_url(client)}. "
+                    f"{exception_detail(exc)}\n"
+                    "Check that LLM_BASE_URL and LLM_MODEL are valid for this API key. "
+                    "After correcting them, rerun with --clear-analysis to discard "
+                    "the failed month's generated artifacts."
+                ) from exc
 
         entry: JsonDict = {
             "comment_id": comment_id,
@@ -3114,36 +3186,17 @@ def match_jobs(
                 match = normalize_match(parsed)
                 source = "llm"
             except LLMJsonParseError as exc:
-                raw_content = exc.raw_content
-                match = normalize_match(
-                    {
-                        "score": 0,
-                        "confidence": "low",
-                        "summary": "LLM matching returned malformed JSON.",
-                        "positive_reasons": [],
-                        "concerns": [str(exc)],
-                        "missing_info": ["Could not parse a valid LLM match response."],
-                        "evidence_quotes": [],
-                        "suggested_action": "Retry matching for this job.",
-                    },
-                )
-                source = "llm_error"
-                parse_error = str(exc)
+                raise AnalyzeError(
+                    f"LLM matching returned invalid JSON for job {job_id}. "
+                    f"Model: {model}. {exc}"
+                ) from exc
             except Exception as exc:
-                match = normalize_match(
-                    {
-                        "score": 0,
-                        "confidence": "low",
-                        "summary": "LLM matching failed.",
-                        "positive_reasons": [],
-                        "concerns": [str(exc)],
-                        "missing_info": ["Could not obtain a valid LLM match response."],
-                        "evidence_quotes": [],
-                        "suggested_action": "Retry matching for this job.",
-                    },
-                )
-                source = "llm_error"
-                parse_error = str(exc)
+                raise AnalyzeError(
+                    f"LLM matching request failed for job {job_id}. "
+                    f"Model: {model}. Base URL: {configured_llm_base_url(client)}. "
+                    f"{exception_detail(exc)}\n"
+                    "Check that LLM_BASE_URL and LLM_MODEL are valid for this API key."
+                ) from exc
 
         entry = {
             "job_id": job_id,
@@ -3825,6 +3878,15 @@ def run(args: argparse.Namespace) -> None:
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
+    if args.clear_analysis:
+        removed = clear_analysis_outputs(args.month)
+        if removed:
+            print("Cleared analysis outputs:")
+            for path in removed:
+                print(f"- {path}")
+        else:
+            print("No existing analysis outputs to clear.")
+
     prefilter_file = prefilter_cache_path(args.month)
     extract_cache_file = extraction_cache_path(args.month)
     match_cache_file = match_cache_path(args.month)
@@ -3893,6 +3955,8 @@ def run(args: argparse.Namespace) -> None:
             return
 
     client, model = make_client(dry_run=args.dry_run)
+    if not args.dry_run:
+        print(f"LLM configuration: model={model}; base_url={configured_llm_base_url(client)}")
     comments_by_id = {comment.get("id"): comment for comment in extraction_comments}
     extraction_entries = extract_comments(
         comments=extraction_comments,
