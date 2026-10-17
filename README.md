@@ -212,7 +212,7 @@ Matching openings keep manual CRM fields such as application status, dates, note
 
 ### 7. Optional: view reports in the local dashboard
 
-The dashboard imports a generated Markdown report into a local PostgreSQL database and provides filtering, report selection, company banning, and application links through Streamlit. Run these commands from the repository root with the virtual environment from step 1 activated.
+The dashboard imports a generated Markdown report into a local PostgreSQL database and provides filtering, report selection, personal application-status tracking, hidden-company controls, raw Apply details, and the original HN post through Streamlit. Run these commands from the repository root with the virtual environment from step 1 activated.
 
 1. Ensure a local PostgreSQL server is running. From a PostgreSQL role that can create databases, initialize a **fresh** dashboard database:
 
@@ -220,7 +220,7 @@ The dashboard imports a generated Markdown report into a local PostgreSQL databa
    psql -h localhost -d postgres -f hiring-dashboard/schema/tables.sql
    ```
 
-   The provided schema already creates and connects to the `hiring_scout` database; do not run a separate `CREATE DATABASE` command or copy the schema into another file. Because the schema starts with `CREATE DATABASE`, this command is only for first-time setup.
+   The provided schema already creates and connects to the `hiring_scout` database; do not run a separate `CREATE DATABASE` command or copy the schema into another file. Because the schema starts with `CREATE DATABASE`, this command is only for first-time setup. For an existing database, run `psql -h localhost -d hiring_scout -f hiring-dashboard/schema/001_personal_job_workflow.sql` instead.
 2. Set the same `DB_CONFIG` values in `hiring-dashboard/injest.py` and `hiring-dashboard/app.py` to match your PostgreSQL user, password, host, and port. The default database name is `hiring_scout`.
 3. Ingest a generated report directly from `data/reports/`:
 
@@ -235,7 +235,7 @@ The dashboard imports a generated Markdown report into a local PostgreSQL databa
    streamlit run hiring-dashboard/app.py
    ```
 
-   Streamlit prints a local URL, normally `http://localhost:8501`; open it in a browser if it does not open automatically. Use the sidebar to filter by report, recommendation bucket, score, and search text. You can ban or unban companies directly from the dashboard.
+   Streamlit prints a local URL, normally `http://localhost:8501`; open it in a browser if it does not open automatically. Use the sidebar to filter by report, recommendation bucket, application status, score, and search text. You can hide or unhide companies and update each job's personal application status directly from the dashboard.
 
 ## Files
 
@@ -263,7 +263,7 @@ Imports a generated Markdown report into the local PostgreSQL dashboard database
 
 `hiring-dashboard/app.py`
 
-Runs the Streamlit dashboard for filtering jobs and managing company bans.
+Runs the Streamlit dashboard for filtering jobs, tracking application status, and managing hidden companies.
 
 `hiring-dashboard/schema/tables.sql`
 

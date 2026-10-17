@@ -1,4 +1,5 @@
 import hashlib
+import json
 import re
 from pathlib import Path
 
@@ -112,7 +113,8 @@ def compact_table_jobs(section: str, bucket: str) -> list[dict]:
                 "salary": values["Salary"],
                 "tech_stack": None,
                 "hn_url": values.get("HN URL"),
-                "apply_url": None,
+                "raw_apply_info": None,
+                "raw_hn_post_text": None,
                 "summary": summary,
                 "why_it_fits": None,
                 "concerns": concerns,
@@ -191,7 +193,16 @@ def parse_report_markdown(file_path: str):
             hn_url = hn_match.group(1).strip() if hn_match else None
 
             apply_match = re.search(r"-\s*Apply:\s*([^\n]+)", body)
-            apply_url = apply_match.group(1).strip() if apply_match else None
+            raw_apply_info = apply_match.group(1).strip() if apply_match else None
+
+            raw_post_match = re.search(r"-\s*Raw HN post:\s*(.+)", body)
+            raw_hn_post_text = None
+            if raw_post_match:
+                raw_post_value = raw_post_match.group(1).strip()
+                try:
+                    raw_hn_post_text = json.loads(raw_post_value)
+                except json.JSONDecodeError:
+                    raw_hn_post_text = raw_post_value
 
             def extract_subfield(name):
                 pattern = rf"{name}:\s*\n(.*?)(?=\n[A-Z][a-zA-Z\s]+:|\n###|\Z)"
@@ -208,7 +219,8 @@ def parse_report_markdown(file_path: str):
                     "salary": salary,
                     "tech_stack": stack,
                     "hn_url": hn_url,
-                    "apply_url": apply_url,
+                    "raw_apply_info": raw_apply_info,
+                    "raw_hn_post_text": raw_hn_post_text,
                     "summary": extract_subfield("Summary"),
                     "why_it_fits": extract_subfield("Why it fits"),
                     "concerns": extract_subfield("Concerns"),
@@ -258,7 +270,7 @@ def ingest_file(file_path: str):
                 INSERT INTO companies (name, clean_name)
                 VALUES (%s, %s)
                 ON CONFLICT (name) DO UPDATE SET clean_name = EXCLUDED.clean_name
-                RETURNING id, is_banned;
+                RETURNING id;
                 """,
                 (job["company"], clean_company),
             )
@@ -269,10 +281,11 @@ def ingest_file(file_path: str):
                 """
                 INSERT INTO jobs (
                     company_id, role_title, fingerprint, score, bucket, location_remote,
-                    salary, tech_stack, hn_comment_url, apply_url, summary, why_it_fits,
-                    concerns, evidence_quotes, hard_filter_reasons, first_seen_report_id, last_seen_report_id
+                    salary, tech_stack, hn_comment_url, raw_apply_info, raw_hn_post_text,
+                    summary, why_it_fits, concerns, evidence_quotes, hard_filter_reasons,
+                    first_seen_report_id, last_seen_report_id
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                 )
                 ON CONFLICT (fingerprint) DO UPDATE SET
                     company_id = EXCLUDED.company_id,
@@ -283,7 +296,8 @@ def ingest_file(file_path: str):
                     salary = COALESCE(EXCLUDED.salary, jobs.salary),
                     tech_stack = COALESCE(EXCLUDED.tech_stack, jobs.tech_stack),
                     hn_comment_url = COALESCE(EXCLUDED.hn_comment_url, jobs.hn_comment_url),
-                    apply_url = COALESCE(EXCLUDED.apply_url, jobs.apply_url),
+                    raw_apply_info = COALESCE(EXCLUDED.raw_apply_info, jobs.raw_apply_info),
+                    raw_hn_post_text = COALESCE(EXCLUDED.raw_hn_post_text, jobs.raw_hn_post_text),
                     summary = COALESCE(EXCLUDED.summary, jobs.summary),
                     why_it_fits = COALESCE(EXCLUDED.why_it_fits, jobs.why_it_fits),
                     concerns = COALESCE(EXCLUDED.concerns, jobs.concerns),
@@ -306,7 +320,8 @@ def ingest_file(file_path: str):
                     job["salary"],
                     job["tech_stack"],
                     job["hn_url"],
-                    job["apply_url"],
+                    job["raw_apply_info"],
+                    job["raw_hn_post_text"],
                     job["summary"],
                     job["why_it_fits"],
                     job["concerns"],

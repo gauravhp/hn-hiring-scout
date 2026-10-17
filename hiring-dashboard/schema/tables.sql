@@ -1,13 +1,13 @@
 CREATE DATABASE hiring_scout;
 \c hiring_scout;
 
--- 1. Companies Table with Banning Capability
+-- 1. Companies Table with personal visibility controls
 CREATE TABLE IF NOT EXISTS companies (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) UNIQUE NOT NULL,
     clean_name VARCHAR(255) NOT NULL,
-    is_banned BOOLEAN DEFAULT FALSE,
-    ban_reason TEXT,
+    is_hidden BOOLEAN DEFAULT FALSE,
+    hide_reason TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS reports (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. Jobs Table with Deduplication Fingerprinting
+-- 3. Jobs Table with deduplication and personal application tracking
 CREATE TABLE IF NOT EXISTS jobs (
     id SERIAL PRIMARY KEY,
     company_id INT REFERENCES companies(id) ON DELETE CASCADE,
@@ -31,11 +31,14 @@ CREATE TABLE IF NOT EXISTS jobs (
     fingerprint VARCHAR(64) UNIQUE NOT NULL, -- MD5 hash of (clean_company + clean_title)
     score NUMERIC(5, 2),
     bucket VARCHAR(50) NOT NULL,             -- must_apply, strong_maybe, maybe, weak_fit, hard_filtered
+    application_status TEXT NOT NULL DEFAULT 'new'
+        CHECK (application_status IN ('new', 'saved', 'applied', 'skipped')),
     location_remote TEXT,
     salary TEXT,
     tech_stack TEXT,
     hn_comment_url TEXT,
-    apply_url TEXT,
+    raw_apply_info TEXT,
+    raw_hn_post_text TEXT,
     summary TEXT,
     why_it_fits TEXT,
     concerns TEXT,
@@ -52,6 +55,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 -- Indexes for performant filtering
 CREATE INDEX IF NOT EXISTS idx_jobs_score ON jobs(score DESC);
 CREATE INDEX IF NOT EXISTS idx_jobs_bucket ON jobs(bucket);
+CREATE INDEX IF NOT EXISTS idx_jobs_application_status ON jobs(application_status);
 CREATE INDEX IF NOT EXISTS idx_jobs_company_id ON jobs(company_id);
-CREATE INDEX IF NOT EXISTS idx_companies_banned ON companies(is_banned);
+CREATE INDEX IF NOT EXISTS idx_companies_hidden ON companies(is_hidden);
 CREATE INDEX IF NOT EXISTS idx_jobs_metadata ON jobs USING gin(metadata);

@@ -3442,6 +3442,7 @@ def rendered_job_details(job: JsonDict, entry: JsonDict) -> str:
     apply_url = as_string_or_none(role.get("apply_url"))
     apply_email = as_string_or_none(role.get("apply_email"))
     apply = ", ".join(item for item in [apply_url, apply_email] if item) or "Not found"
+    raw_hn_post = as_string(source_comment.get("plain_text"))
     tech_stack = as_string_list(role.get("tech_stack"))
 
     if match:
@@ -3479,6 +3480,7 @@ def rendered_job_details(job: JsonDict, entry: JsonDict) -> str:
         f"- Tech stack: {', '.join(tech_stack) if tech_stack else 'Not disclosed'}",
         f"- HN comment: {hn_url}",
         f"- Apply: {apply}",
+        f"- Raw HN post: {json.dumps(raw_hn_post, ensure_ascii=False)}",
         "",
     ]
 
