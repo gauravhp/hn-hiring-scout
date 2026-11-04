@@ -9,7 +9,33 @@ It is intentionally simple:
 - Google Sheets for lightweight CRM tracking
 - optional local PostgreSQL + Streamlit dashboard
 
-## Typical Monthly Flow
+## Index
+
+- [Overview](#hn-hiring-scout)
+- [Quick start: monthly workflow](#quick-start-monthly-workflow)
+  - [Install dependencies](#1-install-dependencies)
+  - [Configure the environment](#2-configure-the-environment)
+  - [Create or edit a profile](#3-create-or-edit-a-profile)
+  - [Fetch an HN thread](#4-fetch-an-hn-thread)
+  - [Analyze jobs](#5-analyze-jobs)
+  - [Recover from an LLM provider failure](#recover-from-an-llm-provider-failure)
+  - [Sync jobs to Google Sheets](#6-sync-jobs-to-google-sheets)
+- [Optional PostgreSQL and Streamlit dashboard](#optional-postgresql-and-streamlit-dashboard)
+  - [Initialize the database](#2-initialize-the-database-and-tables)
+  - [Ingest a report](#3-parse-and-ingest-a-report)
+  - [Launch the dashboard](#4-launch-the-web-dashboard)
+  - [Future reports and deduplication](#future-reports-deduplication-and-hidden-companies)
+- [Project layout](#project-layout)
+- [Detailed command reference](#detailed-command-reference)
+  - [`generate_profile.py`](#generate_profilepy)
+  - [`fetch_hn.py`](#fetch_hnpy)
+  - [`analyze_jobs.py`](#analyze_jobspy)
+  - [`sync_google_sheet.py`](#sync_google_sheetpy)
+- [Google Sheets CRM notes](#google-sheets-crm-notes)
+- [Common recipes](#common-recipes)
+- [Safety notes](#safety-notes)
+
+## Quick start: monthly workflow
 
 Use this flow when you want to analyze the full thread without missing eligible jobs, while still avoiding LLM calls for obvious mismatches.
 
@@ -26,7 +52,7 @@ python3 -m pip install -r requirements.txt
 
 The requirements file includes the PostgreSQL driver and Streamlit dependencies used by the optional dashboard.
 
-### 2. Configure environment
+### 2. Configure the environment
 
 Copy the environment template:
 
@@ -53,7 +79,7 @@ GOOGLE_SHEETS_CREDENTIALS_FILE=/absolute/path/to/service-account.json
 
 Share the Google Sheet with the service account email from the credentials JSON.
 
-### 3. Generate or edit your profile
+### 3. Create or edit a profile
 
 If you want to generate a draft profile from your resume, case studies, notes, or an entire career-profile folder:
 
@@ -95,7 +121,7 @@ The profile controls:
 
 Be especially careful with geography and work authorization fields. The prefilter uses them to reject region-locked roles such as Remote US, EU only, Japan only, or onsite-only jobs.
 
-### 4. Fetch the HN thread
+### 4. Fetch an HN thread
 
 Use the HN item ID:
 
@@ -117,7 +143,7 @@ data/raw/hn_whos_hiring_2026-07_raw.json
 
 Only top-level comments are fetched. Nested replies are ignored.
 
-### 5. Run prefilter + full analysis
+### 5. Analyze jobs
 
 This is the recommended command when you are fine with token usage but still want to avoid LLM calls for clear mismatches (change XXXXX with your profile yaml name): 
 
@@ -175,7 +201,7 @@ python3 analyze_jobs.py \
 `--clear-analysis` removes that month's prefilter, extraction cache, match cache, and report.
 It never deletes `data/raw/`.
 
-### 6. Sync shortlisted jobs to Google Sheets CRM
+### 6. Sync jobs to Google Sheets
 
 Dry-run first:
 
@@ -210,11 +236,11 @@ python3 sync_google_sheet.py --month 2026-07 --replace-month
 
 Matching openings keep manual CRM fields such as application status, dates, notes, and follow-up data.
 
-### 7. Optional: start the local dashboard
+## Optional PostgreSQL and Streamlit dashboard
 
 The Streamlit dashboard imports generated Markdown reports into local PostgreSQL and provides filtering, application tracking, company hiding, raw Apply details, and the original HN post. The dashboard source is already in this repository at `hiring-dashboard/`; do not create an empty directory elsewhere.
 
-#### 1. Create and activate a dashboard virtual environment
+### 1. Create and activate a dashboard virtual environment
 
 From the repository root:
 
@@ -226,7 +252,7 @@ pip install psycopg2-binary streamlit pandas
 cd ..
 ```
 
-#### 2. Initialize the database and tables
+### 2. Initialize the database and tables
 
 Ensure PostgreSQL 14 is running (for example, if it is configured to start at login). For a fresh setup, run the schema from the repository root:
 
@@ -243,7 +269,7 @@ psql -h localhost -d hiring_scout -f hiring-dashboard/schema/002_application_rep
 
 Set the same `DB_CONFIG` values in `hiring-dashboard/injest.py` and `hiring-dashboard/app.py` for your PostgreSQL user, password, host, and port. The default database name is `hiring_scout`.
 
-#### 3. Parse and ingest a report
+### 3. Parse and ingest a report
 
 Place the generated report in `hiring-dashboard/`, then run the ingester. (The script is named `injest.py` in this repository.)
 
@@ -252,7 +278,7 @@ cd hiring-dashboard
 python injest.py hn_whos_hiring_2026-10_report.md
 ```
 
-#### 4. Launch the web dashboard
+### 4. Launch the web dashboard
 
 With the dashboard virtual environment still active, run:
 
@@ -262,7 +288,7 @@ streamlit run app.py
 
 Streamlit prints a local URL, normally `http://localhost:8501`; open it in a browser if it does not open automatically. Use **Job review** to filter openings, apply/save/skip a job, and hide companies. Confirming an application records its date and application method; skipping requires a reason. Use **Application report** in the sidebar to see applied, skipped, and yet-to-apply jobs, the first monthly report in which each job appeared, and editable comments next to each company.
 
-#### Future reports, deduplication, and hidden companies
+### Future reports, deduplication, and hidden companies
 
 | Requirement | Implementation |
 | --- | --- |
@@ -271,7 +297,7 @@ Streamlit prints a local URL, normally `http://localhost:8501`; open it in a bro
 | Hide a company | Select **Hide company** in the dashboard. This sets `companies.is_hidden` to `TRUE`, immediately excluding that company’s current and future roles from active dashboard views. |
 | Store new report fields | The `jobs.metadata` JSONB column is available for arbitrary new key-value pairs from future scout-report formats without a schema migration. |
 
-## Files
+## Project layout
 
 ### Scripts
 
@@ -343,13 +369,13 @@ Generated Markdown reports.
 
 Optional local location for Google service account credentials. Do not commit private credentials.
 
-## Commands
+## Detailed command reference
 
-## `generate_profile.py`
+### `generate_profile.py`
 
 Generates a validated HN Hiring Scout profile YAML from candidate documents.
 
-### Basic usage
+#### Basic usage
 
 ```bash
 python3 generate_profile.py \
@@ -368,7 +394,7 @@ python3 generate_profile.py \
   --output profile.generated.yaml
 ```
 
-### Dry run
+#### Dry run
 
 ```bash
 python3 generate_profile.py --input ~/Career_Profile --dry-run
@@ -376,7 +402,7 @@ python3 generate_profile.py --input ~/Career_Profile --dry-run
 
 Dry-run extracts local text and prints file sizes. It does not call the LLM and does not write a profile.
 
-### Supported input files
+#### Supported input files
 
 - PDF files through `pypdf`
 - DOCX files through `python-docx`
@@ -385,7 +411,7 @@ Dry-run extracts local text and prints file sizes. It does not call the LLM and 
 
 Hidden files are skipped. Very large files are skipped by default to avoid accidentally sending irrelevant binary data.
 
-### Options
+#### Options
 
 `--input`
 
@@ -466,17 +492,17 @@ Runs local validation and extraction tests.
 python3 generate_profile.py --self-test
 ```
 
-### Schema safety
+#### Schema safety
 
 `generate_profile.py` treats `profile.yaml` as the live schema. It validates that generated profiles keep the same top-level sections and nested shapes, preserve geography/work authorization fields, include `evidence_profile` by default, and keep `scoring_weights` summed to 100. If `profile.yaml` changes and the generated result no longer matches, the run fails before writing the profile.
 
 Document contents are sent to your configured LLM provider. Review generated geography, work authorization, compensation, and hard filters before using the profile for analysis.
 
-## `fetch_hn.py`
+### `fetch_hn.py`
 
 Fetches one HN thread and saves top-level comments to `data/raw/`.
 
-### Basic usage
+#### Basic usage
 
 ```bash
 python3 fetch_hn.py --item-id 48747975 --month 2026-07
@@ -486,7 +512,7 @@ python3 fetch_hn.py --item-id 48747975 --month 2026-07
 python3 fetch_hn.py --url "https://news.ycombinator.com/item?id=48747975" --month 2026-07
 ```
 
-### Options
+#### Options
 
 `--item-id`
 
@@ -518,11 +544,11 @@ Where raw JSON should be written. Default is `data/raw`.
 python3 fetch_hn.py --item-id 48747975 --month 2026-07 --output-dir data/raw
 ```
 
-## `analyze_jobs.py`
+### `analyze_jobs.py`
 
 Analyzes raw HN comments and writes processed JSON plus a Markdown report.
 
-### Recommended full analysis with prefilter
+#### Recommended full analysis with prefilter
 
 ```bash
 python3 analyze_jobs.py \
@@ -535,7 +561,7 @@ python3 analyze_jobs.py \
 
 This still runs prefiltering. It does not spend LLM calls on clear mismatches.
 
-### Quick test run without LLM
+#### Quick test run without LLM
 
 ```bash
 python3 analyze_jobs.py \
@@ -546,7 +572,7 @@ python3 analyze_jobs.py \
 
 Dry-run uses heuristics instead of real LLM extraction and ranking. Use it to check plumbing, not final decisions.
 
-### Prefilter only
+#### Prefilter only
 
 ```bash
 python3 analyze_jobs.py \
@@ -557,7 +583,7 @@ python3 analyze_jobs.py \
 
 This writes the prefilter JSON and exits before any LLM calls.
 
-### Budgeted run
+#### Budgeted run
 
 ```bash
 python3 analyze_jobs.py \
@@ -569,7 +595,7 @@ python3 analyze_jobs.py \
 
 Use this when you want to control token usage.
 
-### Fresh rerun
+#### Fresh rerun
 
 ```bash
 python3 analyze_jobs.py \
@@ -583,7 +609,7 @@ python3 analyze_jobs.py \
 
 Use this after changing prompts, filters, profile preferences, or scoring logic.
 
-### Options
+#### Options
 
 `--month`
 
@@ -673,11 +699,11 @@ Runs local tests for JSON parsing, filters, salary parsing, geo matching, scorin
 python3 analyze_jobs.py --self-test
 ```
 
-## `sync_google_sheet.py`
+### `sync_google_sheet.py`
 
 Syncs analyzed jobs into Google Sheets.
 
-### Basic usage
+#### Basic usage
 
 ```bash
 python3 sync_google_sheet.py --month 2026-07
@@ -694,7 +720,7 @@ python3 sync_google_sheet.py \
   --credentials-file /absolute/path/to/service-account.json
 ```
 
-### Dry-run
+#### Dry-run
 
 ```bash
 python3 sync_google_sheet.py --month 2026-07 --dry-run
@@ -702,7 +728,7 @@ python3 sync_google_sheet.py --month 2026-07 --dry-run
 
 Computes what would be imported without writing to Google Sheets.
 
-### Repopulate one month
+#### Repopulate one month
 
 ```bash
 python3 sync_google_sheet.py --month 2026-07 --replace-month
@@ -710,7 +736,7 @@ python3 sync_google_sheet.py --month 2026-07 --replace-month
 
 This removes stale rows associated with the current month and re-adds the latest report rows. Existing matching openings keep manual CRM fields.
 
-### Include lower-priority jobs
+#### Include lower-priority jobs
 
 Include weak fits:
 
@@ -724,7 +750,7 @@ Include skips, hard-filtered jobs, and not-LLM-ranked jobs:
 python3 sync_google_sheet.py --month 2026-07 --include-skips
 ```
 
-### Options
+#### Options
 
 `--month`
 
