@@ -210,32 +210,66 @@ python3 sync_google_sheet.py --month 2026-07 --replace-month
 
 Matching openings keep manual CRM fields such as application status, dates, notes, and follow-up data.
 
-### 7. Optional: view reports in the local dashboard
+### 7. Optional: start the local dashboard
 
-The dashboard imports a generated Markdown report into a local PostgreSQL database and provides filtering, report selection, personal application-status tracking, hidden-company controls, raw Apply details, and the original HN post through Streamlit. Run these commands from the repository root with the virtual environment from step 1 activated.
+The Streamlit dashboard imports generated Markdown reports into local PostgreSQL and provides filtering, application tracking, company hiding, raw Apply details, and the original HN post. The dashboard source is already in this repository at `hiring-dashboard/`; do not create an empty directory elsewhere.
 
-1. Ensure a local PostgreSQL server is running. From a PostgreSQL role that can create databases, initialize a **fresh** dashboard database:
+#### 1. Create and activate a dashboard virtual environment
 
-   ```bash
-   psql -h localhost -d postgres -f hiring-dashboard/schema/tables.sql
-   ```
+From the repository root:
 
-   The provided schema already creates and connects to the `hiring_scout` database; do not run a separate `CREATE DATABASE` command or copy the schema into another file. Because the schema starts with `CREATE DATABASE`, this command is only for first-time setup. For an existing database, run `psql -h localhost -d hiring_scout -f hiring-dashboard/schema/001_personal_job_workflow.sql` instead.
-2. Set the same `DB_CONFIG` values in `hiring-dashboard/injest.py` and `hiring-dashboard/app.py` to match your PostgreSQL user, password, host, and port. The default database name is `hiring_scout`.
-3. Ingest a generated report directly from `data/reports/`:
+```bash
+cd hiring-dashboard
+python3 -m venv venv
+source venv/bin/activate
+pip install psycopg2-binary streamlit pandas
+cd ..
+```
 
-   ```bash
-   python3 hiring-dashboard/injest.py data/reports/hn_whos_hiring_2026-07_report.md
-   ```
+#### 2. Initialize the database and tables
 
-   Re-ingesting later reports updates the latest job details and records reposts. The ingester accepts both detailed and compact report sections.
-4. Start the dashboard:
+Ensure PostgreSQL 14 is running (for example, if it is configured to start at login). For a fresh setup, run the schema from the repository root:
 
-   ```bash
-   streamlit run hiring-dashboard/app.py
-   ```
+```bash
+psql -h localhost -d postgres -f hiring-dashboard/schema/tables.sql
+```
 
-   Streamlit prints a local URL, normally `http://localhost:8501`; open it in a browser if it does not open automatically. Use the sidebar to filter by report, recommendation bucket, application status, score, and search text. You can hide or unhide companies and update each job's personal application status directly from the dashboard.
+`tables.sql` creates and connects to the `hiring_scout` database, so do not run a separate `CREATE DATABASE` command. It is only for first-time setup. To upgrade an existing database, run these migrations in order instead:
+
+```bash
+psql -h localhost -d hiring_scout -f hiring-dashboard/schema/001_personal_job_workflow.sql
+psql -h localhost -d hiring_scout -f hiring-dashboard/schema/002_application_reporting.sql
+```
+
+Set the same `DB_CONFIG` values in `hiring-dashboard/injest.py` and `hiring-dashboard/app.py` for your PostgreSQL user, password, host, and port. The default database name is `hiring_scout`.
+
+#### 3. Parse and ingest a report
+
+Place the generated report in `hiring-dashboard/`, then run the ingester. (The script is named `injest.py` in this repository.)
+
+```bash
+cd hiring-dashboard
+python injest.py hn_whos_hiring_2026-10_report.md
+```
+
+#### 4. Launch the web dashboard
+
+With the dashboard virtual environment still active, run:
+
+```bash
+streamlit run app.py
+```
+
+Streamlit prints a local URL, normally `http://localhost:8501`; open it in a browser if it does not open automatically. Use **Job review** to filter openings, apply/save/skip a job, and hide companies. Confirming an application records its date and application method; skipping requires a reason. Use **Application report** in the sidebar to see applied, skipped, and yet-to-apply jobs, the first monthly report in which each job appeared, and editable comments next to each company.
+
+#### Future reports, deduplication, and hidden companies
+
+| Requirement | Implementation |
+| --- | --- |
+| Ingest a new report | From `hiring-dashboard/`, run `python injest.py <new_report_file.md>`. The ingester creates a report record and links its incoming jobs. |
+| Detect reposts | The pipeline computes an MD5 fingerprint from `clean_company + ":::" + clean_role`. When a company reposts the same role in a later month, PostgreSQL increments `repost_count`, updates the score and last-seen report, and avoids a duplicate job row. |
+| Hide a company | Select **Hide company** in the dashboard. This sets `companies.is_hidden` to `TRUE`, immediately excluding that company’s current and future roles from active dashboard views. |
+| Store new report fields | The `jobs.metadata` JSONB column is available for arbitrary new key-value pairs from future scout-report formats without a schema migration. |
 
 ## Files
 

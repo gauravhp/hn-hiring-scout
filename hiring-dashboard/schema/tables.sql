@@ -33,6 +33,10 @@ CREATE TABLE IF NOT EXISTS jobs (
     bucket VARCHAR(50) NOT NULL,             -- must_apply, strong_maybe, maybe, weak_fit, hard_filtered
     application_status TEXT NOT NULL DEFAULT 'new'
         CHECK (application_status IN ('new', 'saved', 'applied', 'skipped')),
+    applied_at TIMESTAMP WITH TIME ZONE,
+    application_method VARCHAR(50),          -- email, application form, referral, other
+    application_notes TEXT,                  -- personal comments about this company/role
+    skip_reason TEXT,
     location_remote TEXT,
     salary TEXT,
     tech_stack TEXT,
@@ -56,6 +60,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE INDEX IF NOT EXISTS idx_jobs_score ON jobs(score DESC);
 CREATE INDEX IF NOT EXISTS idx_jobs_bucket ON jobs(bucket);
 CREATE INDEX IF NOT EXISTS idx_jobs_application_status ON jobs(application_status);
+CREATE INDEX IF NOT EXISTS idx_jobs_applied_at ON jobs(applied_at DESC);
 CREATE INDEX IF NOT EXISTS idx_jobs_company_id ON jobs(company_id);
 CREATE INDEX IF NOT EXISTS idx_companies_hidden ON companies(is_hidden);
 CREATE INDEX IF NOT EXISTS idx_jobs_metadata ON jobs USING gin(metadata);

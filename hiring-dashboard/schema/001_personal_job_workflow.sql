@@ -34,7 +34,11 @@ ALTER TABLE companies
 ALTER TABLE jobs
     ADD COLUMN IF NOT EXISTS application_status TEXT NOT NULL DEFAULT 'new',
     ADD COLUMN IF NOT EXISTS raw_apply_info TEXT,
-    ADD COLUMN IF NOT EXISTS raw_hn_post_text TEXT;
+    ADD COLUMN IF NOT EXISTS raw_hn_post_text TEXT,
+    ADD COLUMN IF NOT EXISTS applied_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS application_method VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS application_notes TEXT,
+    ADD COLUMN IF NOT EXISTS skip_reason TEXT;
 
 -- Preserve the legacy report-derived Apply value for existing rows.
 DO $$
@@ -72,6 +76,7 @@ BEGIN
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_jobs_application_status ON jobs(application_status);
+CREATE INDEX IF NOT EXISTS idx_jobs_applied_at ON jobs(applied_at DESC);
 CREATE INDEX IF NOT EXISTS idx_companies_hidden ON companies(is_hidden);
 
 COMMIT;
