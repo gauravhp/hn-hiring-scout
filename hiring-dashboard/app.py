@@ -555,7 +555,7 @@ def render_job_review():
                 hide_label = "Unhide Company" if item["is_hidden"] else "Hide Company"
                 with st.popover(hide_label, use_container_width=True):
                     if item["is_hidden"]:
-                        if st.button("Unhide Company", key=f"card_unhide_{item['company_id']}"):
+                        if st.button("Unhide Company", key=f"card_unhide_{item['id']}"):
                             execute_commit(
                                 "UPDATE companies SET is_hidden = FALSE, hide_reason = NULL WHERE id = %s",
                                 (item["company_id"],),
@@ -565,9 +565,9 @@ def render_job_review():
                         hide_reason = st.text_input(
                             "Reason (optional)",
                             placeholder="e.g., not a fit",
-                            key=f"hide_reason_{item['company_id']}",
+                            key=f"hide_reason_{item['id']}",
                         )
-                        if st.button("Hide Company", key=f"hide_{item['company_id']}"):
+                        if st.button("Hide Company", key=f"hide_{item['id']}"):
                             execute_commit(
                                 "UPDATE companies SET is_hidden = TRUE, hide_reason = %s WHERE id = %s",
                                 (hide_reason or None, item["company_id"]),
